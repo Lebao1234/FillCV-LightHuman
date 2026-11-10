@@ -1,0 +1,11 @@
+[run]
+source = .
+omit =
+    tests/*
+    _backup/*
+    */site-packages/*
+concurrency = thread
+
+[report]
+show_missing = False
+skip_empty = True

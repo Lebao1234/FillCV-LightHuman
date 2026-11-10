@@ -1,0 +1,21 @@
+# Giá trị phải khớp tokens.py (test_config_toml_khop_token kiểm tra). Xem docs/design-system.md
+[theme]
+base = "light"
+primaryColor = "#14285a"            # navy
+backgroundColor = "#ffffff"         # white
+secondaryBackgroundColor = "#f5f6f8" # soft
+textColor = "#1f2430"               # ink
+borderColor = "#d9dce3"             # line
+baseRadius = "8px"                  # r-md
+font = "Be Vietnam Pro:https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap"
+codeFont = "JetBrains Mono:https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap"
+
+[client]
+toolbarMode = "minimal"
+
+[server]
+# S1: chỉ nghe trên máy này. Muốn cho máy khác trong mạng dùng -> đặt sau reverse proxy có xác thực
+# (xem README, mục "Mở cho mạng nội bộ"). KHÔNG đổi thành "0.0.0.0" khi chưa có xác thực.
+address = "localhost"
+# S7: giới hạn dung lượng file tải lên (MB). Phải khớp MAX_UPLOAD_MB trong extract.py (test kiểm tra).
+maxUploadSize = 20

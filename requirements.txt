@@ -1,0 +1,15 @@
+# Thư viện chạy app — ghim đúng phiên bản đã kiểm thử (D1). Nâng cấp: đổi số ở đây, cài lại, chạy pytest.
+# Test/đo độ phủ: xem requirements-dev.txt
+streamlit==1.67.0
+openai==3.46.0
+pydantic==2.14.1
+jinja2==3.1.6
+markupsafe==3.0.3            # render.py dùng trực tiếp (Markup, escape)
+playwright==1.64.1           # sau khi cài: python -m playwright install chromium
+pillow==12.3.0
+pymupdf==2.1
+python-docx==1.2.0
+python-dotenv==1.0.1
+opencv-python-headless==4.14.0.94   # tìm khuôn mặt; KHÔNG dùng bản 5.x (đã bỏ Haar cascade)
+numpy==2.5.4                 # render.py dùng trực tiếp khi tìm khuôn mặt
+tzdata==2026.5               # Windows không có sẵn dữ liệu múi giờ cho zoneinfo ("Asia/Ho_Chi_Minh")

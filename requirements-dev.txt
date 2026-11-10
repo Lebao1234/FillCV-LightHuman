@@ -1,0 +1,5 @@
+# Cho người phát triển: thư viện app + công cụ test
+-r requirements.txt
+pytest==9.2.0
+coverage==7.17.2
+httpx==0.28.1                # test dùng trực tiếp để tạo lỗi OpenAI giả (đã có sẵn qua openai)

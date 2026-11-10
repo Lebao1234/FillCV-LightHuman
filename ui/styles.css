@@ -1,0 +1,128 @@
+/* Mọi giá trị dưới đây dùng token từ tokens.py — xem docs/design-system.md */
+header[data-testid="stHeader"]{display:none}
+[data-testid="InputInstructions"]{display:none}   /* ẩn gợi ý "Press Enter to submit form" */
+.stApp{background:var(--white)}
+.block-container{padding:var(--sp-5) var(--sp-6) var(--sp-6); max-width:1480px}
+h4{font-size:var(--fs-base)!important; font-weight:600!important; color:var(--ink)!important; letter-spacing:-.005em}
+
+/* Header */
+.lh-top{display:grid; grid-template-columns:auto 1fr; align-items:center; gap:var(--sp-6);
+        padding:0 0 var(--sp-4); border-bottom:1px solid var(--line); margin-bottom:var(--sp-5)}
+.lh-top img{height:46px; display:block}
+.lh-top .id{display:flex; gap:var(--sp-6); align-items:center}
+.lh-top .sep{height:28px; width:1px; background:var(--line)}
+.lh-top .name{font-weight:600; color:var(--ink); font-size:var(--fs-lg); letter-spacing:-.01em}
+.lh-top .name small{display:block; color:var(--faint); font-weight:400; font-size:var(--fs-sm)}
+
+/* Tiêu đề panel */
+.lh-ph{display:flex; align-items:center; height:40px; margin:0}
+.lh-ph .h{font-size:var(--fs-md); font-weight:600; color:var(--ink); letter-spacing:.06em; text-transform:uppercase;
+          display:flex; align-items:center; gap:var(--sp-2)}
+.lh-ph .h::after{content:""; width:14px; height:2px; background:var(--gold)}
+
+/* Chat */
+.lh-msg{display:flex; flex-direction:column; gap:var(--sp-1); margin:0 0 var(--sp-4);
+        animation:lhIn var(--dur-base) var(--ease) both}
+.lh-msg.tight{margin-bottom:var(--sp-2)}
+.lh-msg .who{font-size:var(--fs-xs); letter-spacing:.07em; text-transform:uppercase; color:var(--faint); font-weight:500}
+.lh-msg .bub{font-size:var(--fs-base); line-height:1.6; color:var(--ink); padding:var(--sp-3) var(--sp-4); max-width:92%}
+.lh-msg.bot .bub{background:var(--white); border:1px solid var(--line);
+                 border-radius:var(--r-sm) var(--r-lg) var(--r-lg) var(--r-lg)}
+.lh-msg.me{align-items:flex-end}
+.lh-msg.me .bub{background:var(--navy-50); border:1px solid var(--navy-100);
+                border-radius:var(--r-lg) var(--r-sm) var(--r-lg) var(--r-lg)}
+.lh-msg.err .bub{border-color:var(--err-line); background:var(--err-bg)}
+.lh-msg b{font-weight:600}
+.lh-file{display:flex; gap:var(--sp-3); align-items:center}
+.lh-file svg{flex:none; color:var(--navy)}
+.lh-file .fn{font-family:var(--font-mono); font-size:var(--fs-sm); color:var(--ink)}
+.lh-file .fm{font-size:var(--fs-sm); color:var(--muted)}
+.lh-sec{padding:var(--sp-3) 0 0; margin-top:var(--sp-3); border-top:1px solid var(--line)}
+.lh-sec:first-of-type{border-top:none; margin-top:var(--sp-1); padding-top:var(--sp-1)}
+.lh-sec .lb{display:flex; justify-content:space-between; font-size:var(--fs-xs); letter-spacing:.07em; text-transform:uppercase;
+            color:var(--muted); font-weight:600; margin-bottom:var(--sp-1)}
+.lh-sec .lb i{font-style:normal; font-weight:500; color:var(--faint)}
+.lh-sec ul{margin:0; padding-left:var(--sp-4)} .lh-sec li{color:var(--ink)} .lh-sec li::marker{color:var(--gold)}
+.lh-sec .none{color:var(--faint); font-size:var(--fs-md)}
+.lh-sal{font-family:var(--font-mono); font-size:var(--fs-md); color:var(--navy); font-weight:500}
+.lh-typing{display:inline-flex; gap:var(--sp-1); padding:var(--sp-1) 0}
+.lh-typing i{width:6px; height:6px; border-radius:50%; background:var(--faint); animation:lhDot 1.2s infinite ease-in-out}
+.lh-typing i:nth-child(2){animation-delay:.15s} .lh-typing i:nth-child(3){animation-delay:.3s}
+
+/* Thanh trạng thái PDF */
+.lh-bar{display:grid; grid-template-columns:auto 1fr auto; gap:var(--sp-3); align-items:center; margin-bottom:var(--sp-3);
+        padding:var(--sp-3) var(--sp-4); border:1px solid var(--line); border-radius:var(--r-md); background:var(--white)}
+.lh-bar svg{color:var(--navy)}
+.lh-bar .txt{min-width:0}
+.lh-bar .fn{font-family:var(--font-mono); font-size:var(--fs-sm); color:var(--ink);
+            overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.lh-bar .fm{font-size:var(--fs-sm); color:var(--faint)}
+
+/* Nhãn trạng thái */
+.lh-pill{font-size:var(--fs-xs); font-weight:600; letter-spacing:.02em; padding:var(--sp-1) var(--sp-3);
+         border-radius:var(--r-pill); white-space:nowrap; display:inline-flex; align-items:center; gap:var(--sp-2)}
+.lh-pill::before{content:""; width:6px; height:6px; border-radius:50%; background:currentColor}
+.lh-pill.ok{color:var(--ok); background:var(--ok-bg)} .lh-pill.warn{color:var(--warn); background:var(--warn-bg)}
+.lh-pill.err{color:var(--err); background:var(--err-bg)} .lh-pill.idle{color:var(--muted); background:var(--soft)}
+
+/* Hộp cảnh báo: err | warn | info | ok */
+.lh-alert{border:1px solid var(--line); border-left:3px solid var(--muted); border-radius:var(--r-md);
+          padding:var(--sp-3) var(--sp-4); margin:var(--sp-3) 0; font-size:var(--fs-md); background:var(--white)}
+.lh-alert .t{font-weight:600; color:var(--ink); margin-bottom:var(--sp-1)}
+.lh-alert ul{margin:var(--sp-1) 0 0; padding-left:var(--sp-4); color:var(--muted)}
+.lh-alert code{font-size:var(--fs-sm); background:var(--soft); padding:0 var(--sp-1); border-radius:var(--r-sm); color:var(--ink)}
+.lh-alert.err{border-color:var(--err-line); border-left-color:var(--err); background:var(--err-bg)}
+.lh-alert.warn{border-color:var(--warn-line); border-left-color:var(--warn); background:var(--warn-bg)}
+.lh-alert.info{border-color:var(--info-line); border-left-color:var(--info); background:var(--info-bg)}
+.lh-alert.ok{border-color:var(--ok-line); border-left-color:var(--ok); background:var(--ok-bg)}
+
+/* Checklist */
+.lh-check{display:grid; grid-template-columns:16px 1fr; gap:var(--sp-1) var(--sp-3); font-size:var(--fs-md);
+          padding:var(--sp-2) 0; border-bottom:1px solid var(--line)}
+.lh-check:last-child{border-bottom:none}
+.lh-check .m{width:8px; height:8px; border-radius:50%; margin-top:.5em; background:var(--ok)}
+.lh-check.no .m{background:var(--err)}
+.lh-check small{grid-column:2; color:var(--faint); font-size:var(--fs-sm)}
+
+/* Khung A4: trạng thái trống + đang xử lý */
+.lh-stage{border:1px solid var(--line); border-radius:var(--r-lg); background:var(--soft); padding:var(--sp-7) var(--sp-6);
+          display:grid; grid-template-columns:minmax(220px,300px) 1fr; gap:var(--sp-7); align-items:center; min-height:620px}
+.lh-sheet{aspect-ratio:210/297; background:var(--white); border:1px solid var(--line); border-radius:var(--r-sm);
+          padding:var(--sp-5); box-shadow:var(--shadow-sheet); display:flex; flex-direction:column; gap:var(--sp-2)}
+.lh-sheet .r{height:7px; border-radius:var(--r-sm); background:var(--skeleton)}
+.lh-sheet .hd{display:flex; justify-content:space-between; padding-bottom:var(--sp-3);
+              border-bottom:2px solid var(--navy-100); margin-bottom:var(--sp-1)}
+.lh-sheet .hd .r{height:12px}
+.lh-sheet .ttl{height:13px; width:58%; background:var(--navy-100)}
+.lh-sheet .acc{height:8px; width:36%; background:var(--gold-100)}
+.lh-sheet .gap{height:8px}
+.lh-busy .lh-sheet .r{background:linear-gradient(90deg,var(--skeleton) 0%,var(--skeleton-hi) 45%,var(--skeleton) 90%);
+          background-size:220% 100%; animation:lhShim 1.4s linear infinite}
+.lh-stage .txt h4{margin:0 0 var(--sp-2); font-size:var(--fs-xl)!important; letter-spacing:-.015em}
+.lh-stage .txt p{margin:0 0 var(--sp-5); color:var(--muted); font-size:var(--fs-base); max-width:44ch; line-height:1.6}
+.lh-steps{display:flex; flex-direction:column; counter-reset:s}
+.lh-steps div{display:grid; grid-template-columns:34px 1fr; padding:var(--sp-3) 0; border-top:1px solid var(--line);
+              font-size:var(--fs-md); color:var(--muted)}
+.lh-steps div::before{counter-increment:s; content:counter(s,decimal-leading-zero); font-family:var(--font-mono);
+          font-size:var(--fs-sm); color:var(--faint)}
+.lh-steps div.on{color:var(--ink); font-weight:500} .lh-steps div.on::before{color:var(--gold-text)}
+.lh-steps div.done{color:var(--faint); text-decoration:line-through; text-decoration-color:var(--line)}
+
+/* Widget Streamlit */
+[data-testid="stForm"]{border:1px solid var(--line); border-radius:var(--r-lg); padding:var(--sp-4); background:var(--white)}
+[data-testid="stFileUploaderDropzone"]{border:1px dashed var(--line-strong); background:var(--soft); border-radius:var(--r-md)}
+[data-testid="stVerticalBlockBorderWrapper"]{border-color:var(--line)!important}
+.stButton button, .stDownloadButton button, [data-testid="stFormSubmitButton"] button{
+  border-radius:var(--r-md); font-weight:500;
+  transition:transform var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease)}
+.stButton button:active, .stDownloadButton button:active, [data-testid="stFormSubmitButton"] button:active{transform:scale(.98)}
+[data-testid="stTabs"] [data-baseweb="tab"]{font-size:var(--fs-md); font-weight:500}
+[data-testid="stExpander"] details{border-color:var(--line); border-radius:var(--r-md)}
+[data-testid="stCode"] pre{border:1px solid var(--line); border-radius:var(--r-md); background:var(--soft)}
+
+@keyframes lhIn{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
+@keyframes lhDot{0%,80%,100%{opacity:.25; transform:translateY(0)} 40%{opacity:1; transform:translateY(-2px)}}
+@keyframes lhShim{from{background-position:120% 0} to{background-position:-120% 0}}
+@media (max-width:900px){ .lh-stage{grid-template-columns:1fr; padding:var(--sp-5)} .lh-sheet{max-width:240px}
+  .lh-top .sep{display:none} .block-container{padding:var(--sp-4)} }
+@media (prefers-reduced-motion:reduce){ *{animation:none!important; transition:none!important} }
