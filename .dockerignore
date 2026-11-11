@@ -1,0 +1,29 @@
+# Dữ liệu CV / xuất — KHÔNG đưa vào image
+data/
+*.log
+
+# Git, IDE, test
+.git/
+.gitignore
+.vscode/
+.pytest_cache/
+.coverage
+.coveragerc
+__pycache__/
+_backup/
+
+# Tài liệu dev (không cần trong image)
+CLAUDE.md
+SKILL.md
+docs/
+requirements-dev.txt
+
+# Docker files (tránh vòng lặp)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Secrets
+.env
+.streamlit/secrets.toml
+

@@ -1,92 +1,130 @@
+{#-
+  Hồ sơ ứng viên PDF — bố cục theo mục 3–5 SKILL.md. Dựng bởi render.render_html().
+
+  Biến vào: cv, project, title, logo, photo, compact, css, company_info, ref_note
+  `css` là toàn bộ CSS đã ghép sẵn bằng Python (render.pdf_css: lề, màu, font, cỡ chữ + template.css)
+  -> khối style không còn biểu thức Jinja. Ở đây chỉ điều khiển class "compact" và số cột ô số liệu.
+-#}
+{%- set en = cv.language == 'en' -%}
+
+{#- ===================================================================== Macro dùng chung #}
+
+{#- Danh sách gạch đầu dòng (cho phép **in đậm**) #}
+{%- macro bullet_list(items) -%}
+  <ul>{% for item in items %}<li>{{ item|bold }}</li>{% endfor %}</ul>
+{%- endmacro %}
+
+{#- Dòng phụ của công việc / vị trí con: có nhãn -> "Nhãn: nội dung", không nhãn -> dòng nghiêng #}
+{%- macro meta_lines(lines) -%}
+  {%- for m in lines %}
+    {% if m.label -%}
+      <p class="meta"><span class="k">{{ m.label }}:</span> {{ m.text|bold }}</p>
+    {%- else -%}
+      <p class="meta plain">{{ m.text|bold }}</p>
+    {%- endif %}
+  {%- endfor %}
+{%- endmacro %}
+
+{#- Các nhóm việc: tiêu đề nhóm (nếu có) + gạch đầu dòng #}
+{%- macro groups(items) -%}
+  {%- for g in items %}
+    {% if g.title %}<div class="grp">{{ g.title }}</div>{% endif %}
+    {{ bullet_list(g.bullets) }}
+  {%- endfor %}
+{%- endmacro %}
+
+{#- ===================================================================== Từng loại mục #}
+
+{%- macro section_text(sec) -%}
+  {% for p in sec.paragraphs %}<p>{{ p|bold }}</p>{% endfor %}
+{%- endmacro %}
+
+{%- macro section_bullets(sec) -%}
+  {{ bullet_list(sec.bullets) }}
+{%- endmacro %}
+
+{%- macro section_cards(sec) -%}
+  <div class="cards{{ ' c3' if sec.cards|length > 4 }}">
+  {%- for c in sec.cards %}
+    <div class="card"><div class="t">{{ c.title }}</div>
+      {#- dùng c['items'] vì c.items trùng tên hàm dict.items() của Python #}
+      {% if c['items'] %}{{ bullet_list(c['items']) }}{% endif %}
+    </div>
+  {%- endfor %}
+  </div>
+{%- endmacro %}
+
+{%- macro section_tags(sec) -%}
+  <div class="tags">{% for t in sec.tags %}<span class="tag">{{ t }}</span>{% endfor %}</div>
+{%- endmacro %}
+
+{%- macro section_career_path(sec) -%}
+  <table class="path">
+  {%- for c in sec.career_path %}
+    <tr{% if c.current %} class="now"{% endif %}><td>{{ c.period }}</td><td>{{ c.title }}</td><td>{{ c.company }}</td></tr>
+  {%- endfor %}
+  </table>
+{%- endmacro %}
+
+{%- macro section_experience(sec) -%}
+  {%- for j in sec.jobs %}
+  <div class="job">
+    <div class="job-head"><span class="company">{{ j.company }}</span>{% if j.period %}<span class="date">{{ j.period }}</span>{% endif %}</div>
+    {% if j.role %}<div class="role">{{ j.role }}</div>{% endif %}
+    {{- meta_lines(j.meta) }}
+    {{- groups(j.groups) }}
+    {%- for s in j.sub_roles %}
+    <div class="sub"><span class="name">{{ s.name }}</span>{% if s.period %}<span class="date">{{ s.period }}</span>{% endif %}</div>
+    {{- meta_lines(s.meta) }}
+    {{- groups(s.groups) }}
+    {%- endfor %}
+  </div>
+  {%- endfor %}
+{%- endmacro %}
+
+{%- macro section_education(sec) -%}
+  <ul class="edu">
+  {%- for e in sec.education %}
+    <li><span><span class="tt">{{ e.title }}</span>{% if e.detail %} – {{ e.detail }}{% endif %}</span>{% if e.period %}<span class="yr">{{ e.period }}</span>{% endif %}</li>
+  {%- endfor %}
+  </ul>
+{%- endmacro %}
+
+{%- macro section_references(sec, note) -%}
+  <div class="ref avoid">
+  {%- for r in sec.references %}
+    <div class="person"><span class="k">{{ r.name }}</span>{% if r.title %} – {{ r.title }}{% endif %}{% if r.company %}, {{ r.company }}{% endif %}</div>
+  {%- endfor %}
+    <p class="note">{{ note }}</p>
+  </div>
+{%- endmacro %}
+
+{#- Loại mục (SectionType trong models.py) -> macro vẽ mục đó #}
+{%- set SECTIONS = {
+  'text': section_text, 'bullets': section_bullets, 'cards': section_cards, 'tags': section_tags,
+  'career_path': section_career_path, 'experience': section_experience, 'education': section_education,
+} -%}
+
+{#- ===================================================================== Trang -#}
 <!doctype html>
-<html lang="{{ 'en' if cv.language == 'en' else 'vi' }}">
+<html lang="{{ 'en' if en else 'vi' }}">
 <head>
 <meta charset="utf-8">
 <title>{{ title }}</title>
-<style>
-/* ===== CSS mẫu — mục 5 SKILL.md ===== */
-{# Lề trang + màu + font lấy từ tokens.py (A7) — giá trị đúng mục 5 SKILL.md #}
-@page { size: A4; margin: {{ le.tren }}mm {{ le.phai }}mm {{ le.duoi }}mm {{ le.trai }}mm; }
-{{ tokens_pdf|safe }}
-*{box-sizing:border-box} html,body{margin:0;padding:0}
-body { font-family:{{ font_serif|safe }}; color:var(--ink); font-size:{{ font_size }}pt; line-height:{{ line_height }}; background:var(--white); }
-
-/* Header */
-.brand { display:flex; align-items:center; justify-content:space-between; padding-bottom:3.5mm; border-bottom:2pt solid var(--navy); }
-.brand img { height:15mm; }
-.brand .right { display:flex; align-items:center; gap:5mm; }
-.brand .co { font-size:9pt; line-height:1.55; padding-right:5mm; border-right:0.8pt solid var(--line); }
-.brand .co .lbl { color:var(--navy); font-weight:bold; display:inline-block; width:16mm; }
-.brand .doc { text-align:right; font-size:9pt; color:var(--muted); letter-spacing:.06em; text-transform:uppercase; line-height:1.5; }
-.brand .doc b { color:var(--navy); font-size:10.5pt; letter-spacing:.1em; }
-.brand .doc .proj { display:block; margin-top:1mm; text-transform:none; letter-spacing:.02em; font-size:10.5pt; color:var(--ink); }
-.brand .doc .proj b { color:var(--gold); font-size:11pt; letter-spacing:.02em; }
-
-/* Khối nhận diện */
-.identity { display:flex; align-items:center; gap:7mm; margin:{{ '8mm' if not compact else '6mm' }} 0 5mm; }
-.identity .photo { width:29mm; height:38mm; object-fit:cover; border:0.8pt solid var(--line); padding:1.2mm; flex:none; }
-.identity h1 { font-size:25pt; color:var(--navy); margin:0 0 1.5mm; letter-spacing:.04em; line-height:1.1; text-transform:uppercase; }
-.identity .title { font-size:13pt; font-weight:bold; color:var(--gold); margin-bottom:3mm; }
-.facts { display:flex; flex-wrap:wrap; gap:1.5mm 7mm; font-size:10.5pt; } .facts b { color:var(--navy); }
-
-/* Hàng ô số liệu */
-.stats { display:grid; grid-template-columns:repeat({{ cv.stats|length if cv.stats|length else 4 }},1fr); background:var(--pdf-stats-bg); border-bottom:2pt solid var(--gold); margin:0 0 2mm; }
-.stat { text-align:center; padding:2.6mm .8mm 2.2mm; border-right:0.8pt solid var(--white); } .stat:last-child{border-right:none}
-.stat .n { font-size:15pt; font-weight:bold; color:var(--navy); line-height:1.2; }
-.stat .l { font-size:8.4pt; color:var(--muted); margin-top:.6mm; white-space:nowrap; }
-
-/* Tiêu đề mục & văn bản */
-h2 { font-size:12.5pt; color:var(--navy); text-transform:uppercase; letter-spacing:.08em; margin:{{ '6mm' if not compact else '4.5mm' }} 0 2.5mm; padding-bottom:1.2mm; border-bottom:0.8pt solid var(--line); display:flex; align-items:center; gap:2.5mm; break-after:avoid; }
-h2::before { content:""; width:3mm; height:3mm; background:var(--gold); transform:rotate(45deg); flex:none; }
-p { margin:0 0 2mm; text-align:justify; }
-ul { margin:0 0 2mm; padding-left:5.5mm; } li { margin:0 0 {{ '1.4mm' if not compact else '1mm' }}; text-align:justify; break-inside:avoid; } li::marker { color:var(--gold); }
-.k { font-weight:bold; color:var(--navy); }
-.avoid { break-inside:avoid; }
-
-/* Năng lực cốt lõi & tag công cụ */
-.cards { display:grid; grid-template-columns:repeat(2,1fr); gap:2.5mm 4mm; } .cards.c3 { grid-template-columns:repeat(3,1fr); }
-.card { border-left:2pt solid var(--yellow); padding:.5mm 0 .5mm 3mm; break-inside:avoid; } .card .t { font-weight:bold; color:var(--navy); }
-.card ul { margin:.5mm 0 0; }
-.tags { display:flex; flex-wrap:wrap; gap:1.5mm; } .tag { border:0.8pt solid var(--line); padding:.3mm 2mm; font-size:9.5pt; }
-
-/* Lộ trình sự nghiệp */
-.path { width:100%; border-collapse:collapse; font-size:10.5pt; }
-.path td { padding:1.2mm 2mm; border-bottom:0.8pt solid var(--line); } .path td:first-child { color:var(--navy); font-weight:bold; white-space:nowrap; }
-.path tr.now td { color:var(--gold); font-weight:bold; }
-
-/* Kinh nghiệm làm việc */
-.job { margin:0 0 {{ '4.5mm' if not compact else '3.5mm' }}; }
-.job-head { display:flex; justify-content:space-between; align-items:baseline; gap:4mm; break-after:avoid; }
-.company { font-weight:bold; font-size:12pt; text-transform:uppercase; }
-.date { flex:none; font-size:10.5pt; color:var(--navy); font-weight:bold; white-space:nowrap; }
-.role { font-style:italic; color:var(--gold); font-weight:bold; margin:.6mm 0 1.6mm; break-after:avoid; }
-.meta { break-after:avoid; margin:0 0 1.4mm; } .meta.plain { font-style:italic; color:var(--muted); }
-.grp { font-weight:bold; color:var(--navy); margin:1.5mm 0 1mm; break-after:avoid; } .grp::before { content:"▸ "; }
-.sub { display:flex; justify-content:space-between; align-items:baseline; margin:2mm 0 1.2mm; padding-left:3mm; border-left:2pt solid var(--yellow); break-after:avoid; }
-.sub .name { font-weight:bold; color:var(--navy); } .sub .date { font-weight:normal; font-style:italic; }
-
-/* Học vấn */
-.edu { padding-left:5.5mm; } .edu li { display:flex; justify-content:space-between; gap:4mm; list-style:none; position:relative; }
-.edu li::before { content:"▪"; color:var(--gold); position:absolute; left:-4.5mm; } .edu .yr { flex:none; color:var(--navy); font-weight:bold; }
-.edu .tt { font-weight:bold; }
-
-/* Người tham chiếu */
-.ref { border:0.8pt solid var(--line); border-left:3pt solid var(--navy); padding:3mm 4mm; background:var(--pdf-ref-bg); }
-.ref .person { margin:0 0 1.5mm; } .ref .note { font-style:italic; color:var(--muted); font-size:10pt; margin:2mm 0 0; }
-</style>
+<style>{{ css }}</style>
 </head>
-<body>
+<body{% if compact %} class="compact"{% endif %}>
 
-{# ===== HEADER (mục 3.1) ===== #}
+{#- ===== HEADER (mục 3.1) ===== #}
 <div class="brand">
-  <img src="{{ logo }}" alt="{{ ct.ten }}">
+  <img src="{{ logo }}" alt="{{ company_info.name }}">
   <div class="right">
     <div class="co">
-      {# A4: thông tin công ty từ config/company.toml (cùng nguồn với bộ lọc PII trong checks.py) #}
-      <span class="lbl">Địa chỉ:</span> {{ ct.dia_chi }}<br>
-      <span class="lbl">Điện thoại:</span> {{ ct.dien_thoai }}<br>
-      <span class="lbl">Email:</span> {{ ct.email }}<br>
-      <span class="lbl">Website:</span> {{ ct.website }}
+      {#- A4: thông tin công ty từ config/company.toml (cùng nguồn với bộ lọc PII trong checks.py) #}
+      <span class="lbl">Địa chỉ:</span> {{ company_info.address }}<br>
+      <span class="lbl">Điện thoại:</span> {{ company_info.phone }}<br>
+      <span class="lbl">Email:</span> {{ company_info.email }}<br>
+      <span class="lbl">Website:</span> {{ company_info.website }}
     </div>
     <div class="doc">
       <b>Hồ sơ ứng viên</b>
@@ -95,102 +133,44 @@ ul { margin:0 0 2mm; padding-left:5.5mm; } li { margin:0 0 {{ '1.4mm' if not com
   </div>
 </div>
 
-{# ===== KHỐI NHẬN DIỆN ===== #}
+{#- ===== KHỐI NHẬN DIỆN ===== #}
 <div class="identity">
   {% if photo %}<img class="photo" src="{{ photo }}" alt="">{% endif %}
   <div>
     <h1>{{ cv.full_name }}</h1>
     {% if cv.target_title %}<div class="title">{{ cv.target_title }}</div>{% endif %}
     <div class="facts">
-      {% if cv.birth_year %}<span><b>{{ 'Year of birth' if cv.language == 'en' else 'Năm sinh' }}:</b> {{ cv.birth_year }}</span>{% endif %}
-      {% if cv.gender %}<span><b>{{ 'Gender' if cv.language == 'en' else 'Giới tính' }}:</b> {{ cv.gender }}</span>{% endif %}
-      {% for f in cv.facts if f.value %}<span>{% if f.label %}<b>{{ f.label }}:</b> {% endif %}{{ f.value }}</span>{% endfor %}
+      {%- if cv.birth_year %}
+      <span><b>{{ 'Year of birth' if en else 'Năm sinh' }}:</b> {{ cv.birth_year }}</span>
+      {%- endif %}
+      {%- if cv.gender %}
+      <span><b>{{ 'Gender' if en else 'Giới tính' }}:</b> {{ cv.gender }}</span>
+      {%- endif %}
+      {%- for f in cv.facts if f.value %}
+      <span>{% if f.label %}<b>{{ f.label }}:</b> {% endif %}{{ f.value }}</span>
+      {%- endfor %}
     </div>
   </div>
 </div>
 
-{# ===== HÀNG Ô SỐ LIỆU ===== #}
-{% if cv.stats %}
-<div class="stats">
-  {% for s in cv.stats %}
+{#- ===== HÀNG Ô SỐ LIỆU ===== #}
+{%- if cv.stats %}
+<div class="stats" style="--stats-cols: {{ cv.stats|length }}">
+  {%- for s in cv.stats %}
   <div class="stat"><div class="n">{{ s.value }}</div><div class="l">{{ s.label }}</div></div>
-  {% endfor %}
+  {%- endfor %}
 </div>
-{% endif %}
+{%- endif %}
 
-{# ===== CÁC MỤC NỘI DUNG ===== #}
-{% for sec in cv.sections %}
+{#- ===== CÁC MỤC NỘI DUNG ===== #}
+{%- for sec in cv.sections %}
 <h2>{{ sec.title }}</h2>
-
-{% if sec.type == 'text' %}
-  {% for p in sec.paragraphs %}<p>{{ p|bold }}</p>{% endfor %}
-
-{% elif sec.type == 'bullets' %}
-  <ul>{% for b in sec.bullets %}<li>{{ b|bold }}</li>{% endfor %}</ul>
-
-{% elif sec.type == 'cards' %}
-  <div class="cards{{ ' c3' if sec.cards|length > 4 }}">
-  {% for c in sec.cards %}
-    <div class="card"><div class="t">{{ c.title }}</div>
-      {# dùng c['items'] vì c.items trùng tên hàm dict.items() của Python #}
-      {% if c['items'] %}<ul>{% for it in c['items'] %}<li>{{ it|bold }}</li>{% endfor %}</ul>{% endif %}
-    </div>
-  {% endfor %}
-  </div>
-
-{% elif sec.type == 'tags' %}
-  <div class="tags">{% for t in sec.tags %}<span class="tag">{{ t }}</span>{% endfor %}</div>
-
-{% elif sec.type == 'career_path' %}
-  <table class="path">
-  {% for c in sec.career_path %}
-    <tr{% if c.current %} class="now"{% endif %}><td>{{ c.period }}</td><td>{{ c.title }}</td><td>{{ c.company }}</td></tr>
-  {% endfor %}
-  </table>
-
-{% elif sec.type == 'experience' %}
-  {% for j in sec.jobs %}
-  <div class="job">
-    <div class="job-head"><span class="company">{{ j.company }}</span>{% if j.period %}<span class="date">{{ j.period }}</span>{% endif %}</div>
-    {% if j.role %}<div class="role">{{ j.role }}</div>{% endif %}
-    {% for m in j.meta %}
-      {% if m.label %}<p class="meta"><span class="k">{{ m.label }}:</span> {{ m.text|bold }}</p>
-      {% else %}<p class="meta plain">{{ m.text|bold }}</p>{% endif %}
-    {% endfor %}
-    {% for g in j.groups %}
-      {% if g.title %}<div class="grp">{{ g.title }}</div>{% endif %}
-      <ul>{% for b in g.bullets %}<li>{{ b|bold }}</li>{% endfor %}</ul>
-    {% endfor %}
-    {% for s in j.sub_roles %}
-      <div class="sub"><span class="name">{{ s.name }}</span>{% if s.period %}<span class="date">{{ s.period }}</span>{% endif %}</div>
-      {% for m in s.meta %}
-        {% if m.label %}<p class="meta"><span class="k">{{ m.label }}:</span> {{ m.text|bold }}</p>
-        {% else %}<p class="meta plain">{{ m.text|bold }}</p>{% endif %}
-      {% endfor %}
-      {% for g in s.groups %}
-        {% if g.title %}<div class="grp">{{ g.title }}</div>{% endif %}
-        <ul>{% for b in g.bullets %}<li>{{ b|bold }}</li>{% endfor %}</ul>
-      {% endfor %}
-    {% endfor %}
-  </div>
-  {% endfor %}
-
-{% elif sec.type == 'education' %}
-  <ul class="edu">
-  {% for e in sec.education %}
-    <li><span><span class="tt">{{ e.title }}</span>{% if e.detail %} – {{ e.detail }}{% endif %}</span>{% if e.period %}<span class="yr">{{ e.period }}</span>{% endif %}</li>
-  {% endfor %}
-  </ul>
-
-{% elif sec.type == 'references' %}
-  <div class="ref avoid">
-  {% for r in sec.references %}
-    <div class="person"><span class="k">{{ r.name }}</span>{% if r.title %} – {{ r.title }}{% endif %}{% if r.company %}, {{ r.company }}{% endif %}</div>
-  {% endfor %}
-    <p class="note">{{ ref_note }}</p>
-  </div>
-{% endif %}
-{% endfor %}
+{% if sec.type == 'references' -%}
+  {{ section_references(sec, ref_note) }}
+{%- else -%}
+  {{ SECTIONS[sec.type](sec) }}
+{%- endif %}
+{%- endfor %}
 
 </body>
 </html>

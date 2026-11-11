@@ -7,7 +7,7 @@ Tài liệu cho người sửa giao diện web app (`app.py`) và mẫu hồ sơ
 1. **Một nguồn token duy nhất: [`infra/tokens.py`](../infra/tokens.py).** Web app, mẫu PDF, footer PDF và theme Streamlit cùng lấy giá trị từ đây. Không viết mã màu, cỡ chữ, khoảng cách hay bo góc trực tiếp vào CSS. Test `tests/test_design_tokens.py` sẽ báo lỗi nếu có.
 2. **Mẫu PDF theo đúng SKILL.md.** Token PDF (`css_vars("pdf")`) giữ nguyên giá trị mục 5 SKILL.md. Sửa token mà làm đổi PDF tức là đổi chuẩn hồ sơ, cần chị Trâm duyệt.
 3. **Navy là màu nhấn duy nhất, gold chỉ để trang trí.** Gold sáng (`--gold`) dùng cho vạch, chấm đầu dòng. Khi cần chữ màu vàng, dùng `--gold-text`.
-4. **Chữ trên nền phải đạt WCAG AA (≥ 4.5:1).** Mọi cặp chữ/nền đang dùng được liệt kê trong `tokens.CAP_CHU_NEN` và được test kiểm tra.
+4. **Chữ trên nền phải đạt WCAG AA (≥ 4.5:1).** Mọi cặp chữ/nền đang dùng được liệt kê trong `tokens.TEXT_BG_PAIRS` và được test kiểm tra.
 5. **Không emoji.** Icon dùng SVG nét 1.5px hoặc Material Symbols của Streamlit (`icon=":material/...:"`).
 
 ## Cách đổi một token
@@ -148,10 +148,10 @@ Thông báo ngay trong khung PDF: lỗi cần sửa, nhắc cập nhật.
 | `info` | Thông tin trung tính |
 | `ok` | Xác nhận đã xong |
 
-| Thuộc tính (`alert(kind, tieu_de, items)`) | Kiểu | Mô tả |
+| Thuộc tính (`alert(kind, title, items)`) | Kiểu | Mô tả |
 |---|---|---|
 | `kind` | `"err" \| "warn" \| "info" \| "ok"` | Biến thể |
-| `tieu_de` | str (HTML đã escape) | Một câu nói rõ chuyện gì và phải làm gì |
+| `title` | str (HTML đã escape) | Một câu nói rõ chuyện gì và phải làm gì |
 | `items` | list[str] \| None | Chi tiết, mỗi dòng một ý. Dùng `<code>` cho giá trị bị bắt |
 
 - **Truy cập:** tiêu đề in đậm, đọc được ngay. Màu chỉ là tín hiệu phụ, viền trái 3px giúp phân biệt cả khi in đen trắng.
@@ -169,14 +169,14 @@ Thông báo ngay trong khung PDF: lỗi cần sửa, nhắc cập nhật.
 - **Cấu trúc:** `.who` là nhãn người gửi (chữ hoa `--fs-xs`), `.bub` là nội dung. Kết quả đọc CV chia thành các `.lh-sec` (nhãn + số lượng + danh sách).
 - **Trạng thái:** đang xử lý dùng `.lh-typing` (ba chấm nhấp nháy).
 - **Chuyển động:** hiện dần và dịch lên 6px (`lhIn`, `--dur-base`).
-- **Mã:** `ve_tin(m)` trong `app.py`. Tin lưu trong `st.session_state.chat` dạng `{role, kind, ...}`.
+- **Mã:** `render_message(m)` trong `ui/components.py`. Tin lưu trong `st.session_state.chat` dạng `{role, kind, ...}`.
 
 ### Thanh trạng thái PDF (`lh-bar`)
 
 Một dòng trên cùng tab Bản PDF: icon tài liệu, tên file (mono), "A4 · n trang", và nhãn trạng thái.
 
 - **Trạng thái:** nhãn bên phải theo bảng của `lh-pill`. Tên file dài bị cắt bằng dấu "…".
-- **Mã:** điền vào `o_thanh` sau khi đã biết trạng thái duyệt, để thanh luôn nằm trên cùng.
+- **Mã:** điền vào `bar_slot` sau khi đã biết trạng thái duyệt, để thanh luôn nằm trên cùng.
 
 ### Dòng checklist (`lh-check`)
 
@@ -189,14 +189,14 @@ Trạng thái trống và trạng thái đang xử lý của khung PDF.
 | Biến thể | Dùng khi | Hành vi |
 |---|---|---|
 | `stage(False)` | Chưa có hồ sơ | Trang A4 mờ + 3 bước hướng dẫn 01–03 |
-| `stage(True, buoc)` | Đang đọc CV / dựng PDF | Vệt sáng chạy qua các vạch (`lhShim`); bước `buoc` đang làm (chữ đậm, số `--gold-text`), các bước trước bị gạch |
+| `stage(True, step)` | Đang đọc CV / dựng PDF | Vệt sáng chạy qua các vạch (`lhShim`); bước `step` đang làm (chữ đậm, số `--gold-text`), các bước trước bị gạch |
 
 - **Truy cập:** vệt sáng tự tắt khi bật giảm chuyển động; tiến độ vẫn đọc được qua chữ của từng bước.
 - **Không nên:** dùng vòng xoay (`st.spinner`) trong khung PDF.
 
 ### Header (`lh-top`) và tiêu đề panel (`lh-ph`)
 
-- **Header:** logo (cao 46px, cắt bằng `render.cat_logo`), vạch ngăn, tên công cụ (`--fs-lg`) và mô tả (`--fs-sm`, `--faint`). Màn hình hẹp (< 900px) thì ẩn vạch ngăn.
+- **Header:** logo (cao 46px, cắt bằng `render.crop_logo`), vạch ngăn, tên công cụ (`--fs-lg`) và mô tả (`--fs-sm`, `--faint`). Màn hình hẹp (< 900px) thì ẩn vạch ngăn.
 - **Tiêu đề panel:** chữ hoa `--fs-md`, theo sau là vạch gold 14×2px. Cao cố định 40px để hai cột thẳng hàng với nút "Làm mới".
 
 ### Nút (Streamlit)
@@ -219,6 +219,6 @@ Header, khối nhận diện, ô số liệu, thẻ năng lực, lộ trình, ki
 ## Thêm thành phần mới
 
 1. Kiểm tra bảng trên xem đã có thành phần gần giống chưa (ví dụ một thông báo mới thì dùng `lh-alert`, không tạo hộp mới).
-2. Dùng tiền tố `lh-`, chỉ dùng `var(--...)` từ `infra/tokens.py`. Cần màu mới thì thêm vào `MAU`, kèm cặp chữ/nền vào `CAP_CHU_NEN` nếu là màu chữ.
+2. Dùng tiền tố `lh-`, chỉ dùng `var(--...)` từ `infra/tokens.py`. Cần màu mới thì thêm vào `COLORS`, kèm cặp chữ/nền vào `TEXT_BG_PAIRS` nếu là màu chữ.
 3. Có đủ các trạng thái cần thiết (trống, đang tải, lỗi) và tôn trọng `prefers-reduced-motion`.
 4. Thêm một mục vào tài liệu này: dùng khi nào, có biến thể nào, trạng thái ra sao, lưu ý truy cập.

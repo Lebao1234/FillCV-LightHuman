@@ -6,40 +6,43 @@ thông tin nhạy cảm trong dữ liệu lẫn trong chính file PDF.
 """
 from dataclasses import dataclass
 
-from services.privacy.checks import pdf_sach
+from services.privacy.checks import pdf_clean
 
-GOI_Y_KHOA_TAI = "Cần tick 2 ô xác nhận, PDF mới nhất và không còn thông tin nhạy cảm"
+DOWNLOAD_LOCKED_HINT = "Cần tick 2 ô xác nhận, PDF mới nhất và không còn thông tin nhạy cảm"
 
 
+# Trạng thái khung PDF (cũ/bẩn/được tải + nhãn)
 @dataclass(frozen=True)
-class TrangThaiPdf:
-    cu: bool          # PDF đang hiển thị không còn khớp nội dung đang sửa -> cần "Cập nhật PDF"
-    pdf_ban: bool     # chính file PDF vẫn còn thông tin liên hệ của ứng viên (checklist mục 'pii')
-    cho_tai: bool     # nút "Tải PDF" được bật
-    pill_loai: str    # ok | warn | err | idle (class CSS của nhãn trạng thái)
-    pill_chu: str     # chữ trên nhãn trạng thái
+class PdfStatus:
+    outdated: bool          # PDF đang hiển thị không còn khớp nội dung đang sửa -> cần "Cập nhật PDF"
+    pdf_dirty: bool     # chính file PDF vẫn còn thông tin liên hệ của ứng viên (checklist mục 'pii')
+    can_download: bool     # nút "Tải PDF" được bật
+    pill_kind: str    # ok | warn | err | idle (class CSS của nhãn trạng thái)
+    pill_text: str     # chữ trên nhãn trạng thái
 
 
-def pdf_cu(co_pdf: bool, dau_pdf: str | None, dau_hien_tai: str) -> bool:
+# PDF có còn khớp nội dung đang sửa không
+def pdf_outdated(has_pdf: bool, pdf_fingerprint: str | None, current_fingerprint: str) -> bool:
     """PDF đã dựng nhưng nội dung/ảnh/dự án đã đổi sau đó."""
-    return co_pdf and dau_pdf != dau_hien_tai
+    return has_pdf and pdf_fingerprint != current_fingerprint
 
 
-def tinh_trang_thai(*, co_pdf: bool, dau_pdf: str | None, dau_hien_tai: str, checklist: list[dict] | None,
-                    co_vi_pham: bool, co_loi_cau_truc: bool, da_kiem_tu_lap: bool, da_duyet: bool) -> TrangThaiPdf:
+# Tính trạng thái khung PDF và luật mở nút Tải
+def compute_status(*, has_pdf: bool, pdf_fingerprint: str | None, current_fingerprint: str, checklist: list[dict] | None,
+                    has_violations: bool, has_structure_errors: bool, checked_generated: bool, reviewed: bool) -> PdfStatus:
     """Tính toàn bộ trạng thái của khung PDF từ dữ liệu hiện có."""
-    cu = pdf_cu(co_pdf, dau_pdf, dau_hien_tai)
-    pdf_ban = co_pdf and not cu and not pdf_sach(checklist)
-    cho_tai = (co_pdf and da_kiem_tu_lap and da_duyet and not cu and not co_vi_pham
-               and not co_loi_cau_truc and not pdf_ban)
-    if co_loi_cau_truc or co_vi_pham or pdf_ban:
+    outdated = pdf_outdated(has_pdf, pdf_fingerprint, current_fingerprint)
+    pdf_dirty = has_pdf and not outdated and not pdf_clean(checklist)
+    can_download = (has_pdf and checked_generated and reviewed and not outdated and not has_violations
+               and not has_structure_errors and not pdf_dirty)
+    if has_structure_errors or has_violations or pdf_dirty:
         pill = ("err", "Cần sửa")
-    elif cu:
+    elif outdated:
         pill = ("warn", "Cần cập nhật")
-    elif cho_tai:
+    elif can_download:
         pill = ("ok", "Sẵn sàng tải")
-    elif co_pdf:
+    elif has_pdf:
         pill = ("idle", "Chờ duyệt")
     else:
         pill = ("idle", "Chưa dựng")
-    return TrangThaiPdf(cu=cu, pdf_ban=pdf_ban, cho_tai=cho_tai, pill_loai=pill[0], pill_chu=pill[1])
+    return PdfStatus(outdated=outdated, pdf_dirty=pdf_dirty, can_download=can_download, pill_kind=pill[0], pill_text=pill[1])

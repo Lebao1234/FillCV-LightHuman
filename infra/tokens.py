@@ -3,8 +3,8 @@
 Dùng ở:
   - app.py            : css_vars("web") chèn vào đầu khối CSS của web app
   - template.html     : css_vars("pdf") -> :root của hồ sơ PDF (giá trị theo mục 5 SKILL.md)
-  - render_worker.py  : MAU[...] cho footer PDF (footer của Chromium không đọc được biến CSS)
-  - .streamlit/config.toml : phải khớp MAU (test kiểm tra) vì file toml không đọc được Python
+  - render_worker.py  : COLORS[...] cho footer PDF (footer của Chromium không đọc được biến CSS)
+  - .streamlit/config.toml : phải khớp COLORS (test kiểm tra) vì file toml không đọc được Python
 
 Đổi một màu -> sửa ở đây, rồi chạy `python -m infra.tokens` để in lại bảng cho docs/design-system.md.
 Tài liệu: docs/design-system.md
@@ -15,7 +15,7 @@ Tài liệu: docs/design-system.md
 # ---------------------------------------------------------------------------
 # Màu gốc: thương hiệu + trung tính. Chữ/đường kẻ lấy đúng giá trị SKILL.md mục 5 để
 # web app và PDF dùng chung một bộ (trước đây web app dùng #1c2333/#5b6476/#e3e6ec, lệch PDF).
-MAU = {
+COLORS = {
     # Thương hiệu
     "navy": "#14285a",          # màu nhấn chính: nút, tiêu đề, tên ứng viên trong PDF
     "navy-50": "#eef1f7",       # nền bong bóng tin của người dùng
@@ -53,71 +53,75 @@ FONT = {
     "mono": '"JetBrains Mono", ui-monospace, monospace',
     "serif-pdf": '"Times New Roman", "Liberation Serif", Times, serif',
 }
-CO_CHU = {"xs": "11px", "sm": "12px", "md": "13px", "base": "14px", "lg": "16px", "xl": "18px"}
-KHOANG_CACH = {"1": "4px", "2": "8px", "3": "12px", "4": "16px", "5": "24px", "6": "32px", "7": "40px"}
-BO_GOC = {"sm": "4px", "md": "8px", "lg": "12px", "pill": "999px"}
-BONG = {"sheet": "0 24px 48px -28px rgba(20, 40, 90, .22)"}
-CHUYEN_DONG = {"ease": "cubic-bezier(.16, 1, .3, 1)", "fast": ".2s", "base": ".45s"}
+FONT_SIZE = {"xs": "11px", "sm": "12px", "md": "13px", "base": "14px", "lg": "16px", "xl": "18px"}
+SPACING = {"1": "4px", "2": "8px", "3": "12px", "4": "16px", "5": "24px", "6": "32px", "7": "40px"}
+RADIUS = {"sm": "4px", "md": "8px", "lg": "12px", "pill": "999px"}
+SHADOW = {"sheet": "0 24px 48px -28px rgba(20, 40, 90, .22)"}
+MOTION = {"ease": "cubic-bezier(.16, 1, .3, 1)", "fast": ".2s", "base": ".45s"}
 
 # A7: lề trang A4 của hồ sơ PDF (mm) — mục 5 SKILL.md. Dùng chung cho @page (template.html),
 # lề footer (render_worker.py) và vùng nội dung khi đo độ đầy trang cuối (pdf_utils.pdf_layout).
-PDF_LE_MM = {"tren": 16, "phai": 17, "duoi": 20, "trai": 17}
+PDF_MARGIN_MM = {"top": 16, "right": 17, "bottom": 20, "left": 17}
 A4_MM = (210, 297)
 
 # Các token PDF dùng (tên biến CSS giữ nguyên như mục 5 SKILL.md để template không đổi)
-_PDF = ["navy", "gold", "yellow", "ink", "muted", "line", "white", "pdf-stats-bg", "pdf-ref-bg"]
+_PDF_TOKENS = ["navy", "gold", "yellow", "ink", "muted", "line", "white", "pdf-stats-bg", "pdf-ref-bg"]
 
 
-def css_vars(noi_dung: str = "web") -> str:
+# Sinh khối :root chứa biến CSS cho web/PDF
+def css_vars(target: str = "web") -> str:
     """Khối `:root{...}` cho web app ("web") hoặc hồ sơ PDF ("pdf")."""
-    if noi_dung == "pdf":
-        dong = [f"--{k}:{MAU[k]}" for k in _PDF]
+    if target == "pdf":
+        lines = [f"--{k}:{COLORS[k]}" for k in _PDF_TOKENS]
     else:
-        dong = [f"--{k}:{v}" for k, v in MAU.items() if not k.startswith("pdf-")]
-        dong += [f"--font-{k}:{v}" for k, v in FONT.items() if k != "serif-pdf"]
-        dong += [f"--fs-{k}:{v}" for k, v in CO_CHU.items()]
-        dong += [f"--sp-{k}:{v}" for k, v in KHOANG_CACH.items()]
-        dong += [f"--r-{k}:{v}" for k, v in BO_GOC.items()]
-        dong += [f"--shadow-{k}:{v}" for k, v in BONG.items()]
-        dong += [f"--{'ease' if k == 'ease' else 'dur-' + k}:{v}" for k, v in CHUYEN_DONG.items()]
-    return ":root{" + "; ".join(dong) + ";}"
+        lines = [f"--{k}:{v}" for k, v in COLORS.items() if not k.startswith("pdf-")]
+        lines += [f"--font-{k}:{v}" for k, v in FONT.items() if k != "serif-pdf"]
+        lines += [f"--fs-{k}:{v}" for k, v in FONT_SIZE.items()]
+        lines += [f"--sp-{k}:{v}" for k, v in SPACING.items()]
+        lines += [f"--r-{k}:{v}" for k, v in RADIUS.items()]
+        lines += [f"--shadow-{k}:{v}" for k, v in SHADOW.items()]
+        lines += [f"--{'ease' if k == 'ease' else 'dur-' + k}:{v}" for k, v in MOTION.items()]
+    return ":root{" + "; ".join(lines) + ";}"
 
 
 # ---------------------------------------------------------------------------
 # Độ tương phản (WCAG 2.1) — dùng trong test và khi chọn màu mới
 # ---------------------------------------------------------------------------
-def _do_sang(hex_mau: str) -> float:
-    h = hex_mau.lstrip("#")
+# Độ sáng tương đối của một màu (WCAG)
+def _luminance(hex_color: str) -> float:
+    h = hex_color.lstrip("#")
     c = [int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)]
     c = [x / 12.92 if x <= .04045 else ((x + .055) / 1.055) ** 2.4 for x in c]
     return .2126 * c[0] + .7152 * c[1] + .0722 * c[2]
 
 
-def tuong_phan(chu: str, nen: str) -> float:
-    a, b = _do_sang(MAU.get(chu, chu)), _do_sang(MAU.get(nen, nen))
+# Tỉ lệ tương phản chữ/nền
+def contrast(fg: str, bg: str) -> float:
+    a, b = _luminance(COLORS.get(fg, fg)), _luminance(COLORS.get(bg, bg))
     return (max(a, b) + .05) / (min(a, b) + .05)
 
 
 # Các cặp chữ/nền thực sự xuất hiện trên giao diện — đều phải >= 4.5:1
-CAP_CHU_NEN = [
+TEXT_BG_PAIRS = [
     ("ink", "white"), ("muted", "white"), ("faint", "white"), ("faint", "soft"), ("muted", "soft"),
     ("gold-text", "white"), ("gold-text", "soft"), ("white", "navy"), ("navy", "navy-50"),
     ("ok", "ok-bg"), ("warn", "warn-bg"), ("err", "err-bg"), ("info", "info-bg"), ("ink", "navy-50"),
 ]
 
 
-def bang_markdown() -> str:
+# Bảng token cho docs/design-system.md
+def markdown_table() -> str:
     """Bảng token cho docs/design-system.md (chạy `python -m infra.tokens`)."""
     out = ["| Token | Giá trị |", "|---|---|"]
-    out += [f"| `--{k}` | `{v}` |" for k, v in MAU.items()]
-    for ten, nhom, tien_to in [("Cỡ chữ", CO_CHU, "fs"), ("Khoảng cách", KHOANG_CACH, "sp"), ("Bo góc", BO_GOC, "r")]:
-        out += ["", f"| {ten} | Giá trị |", "|---|---|"] + [f"| `--{tien_to}-{k}` | `{v}` |" for k, v in nhom.items()]
+    out += [f"| `--{k}` | `{v}` |" for k, v in COLORS.items()]
+    for name, group, prefix in [("Cỡ chữ", FONT_SIZE, "fs"), ("Khoảng cách", SPACING, "sp"), ("Bo góc", RADIUS, "r")]:
+        out += ["", f"| {name} | Giá trị |", "|---|---|"] + [f"| `--{prefix}-{k}` | `{v}` |" for k, v in group.items()]
     out += ["", "| Cặp chữ / nền | Tương phản |", "|---|---|"]
-    out += [f"| `{c}` / `{n}` | {tuong_phan(c, n):.2f}:1 |" for c, n in CAP_CHU_NEN]
+    out += [f"| `{c}` / `{n}` | {contrast(c, n):.2f}:1 |" for c, n in TEXT_BG_PAIRS]
     return "\n".join(out)
 
 
 if __name__ == "__main__":
     import sys
     sys.stdout.reconfigure(encoding="utf-8")
-    print(bang_markdown())
+    print(markdown_table())

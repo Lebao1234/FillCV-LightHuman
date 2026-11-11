@@ -2,4 +2,4 @@
 -r requirements.txt
 pytest==9.2.0
 coverage==7.17.2
-httpx==0.28.1                # test dùng trực tiếp để tạo lỗi OpenAI giả (đã có sẵn qua openai)
+python-docx==1.2.0           # test dựng file DOCX giả (app không cần)

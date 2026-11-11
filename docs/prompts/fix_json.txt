@@ -1,2 +1,2 @@
 JSON trên bị lỗi, hãy trả lại toàn bộ JSON đã sửa.
-Lỗi: {loi}
+Lỗi: {error}

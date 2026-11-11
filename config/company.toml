@@ -3,15 +3,15 @@
 #         render_worker.py (footer), render.py (ghi chú người tham chiếu).
 # Đổi SĐT/email/website ở đây là đủ: header PDF và bộ lọc PII cùng đổi theo, PDF không bị chặn tải.
 
-[cong_ty]
-ten = "Light Human"
-dia_chi = "213 Chu Văn An, Phường Bình Thạnh, TP. Hồ Chí Minh"
-dien_thoai = "028 3842 5188"
+[company]
+name = "Light Human"
+address = "213 Chu Văn An, Phường Bình Thạnh, TP. Hồ Chí Minh"
+phone = "028 3842 5188"
 email = "info@lighthuman.vn"
 website = "https://lighthuman.vn/"
-ten_mien = "lighthuman.vn"          # tên miền được phép xuất hiện trong PDF (kể cả tên miền con)
+domain = "lighthuman.vn"          # tên miền được phép xuất hiện trong PDF (kể cả tên miền con)
 
 [pdf]
-# {ten} = tên công ty (in đậm màu navy ở footer)
-footer_gioi_thieu = "Hồ sơ do {ten} giới thiệu · Thông tin liên hệ của ứng viên được bảo mật"
-ghi_chu_tham_chieu = "Thông tin liên hệ người tham chiếu sẽ được Light Human cung cấp khi Quý khách hàng có nhu cầu kiểm tra tham chiếu."
+# {name} = tên công ty (in đậm màu navy ở footer)
+footer_intro = "Hồ sơ do {name} giới thiệu · Thông tin liên hệ của ứng viên được bảo mật"
+reference_note = "Thông tin liên hệ người tham chiếu sẽ được Light Human cung cấp khi Quý khách hàng có nhu cầu kiểm tra tham chiếu."

@@ -1,7 +1,7 @@
 """Thời hạn lưu hồ sơ PDF đã xuất (S2).
 
 File PDF trong data/output chứa họ tên + quá trình làm việc của ứng viên -> không giữ vô thời hạn.
-Mặc định xoá file quá 30 ngày; đổi bằng OUTPUT_RETENTION_DAYS trong .env (0 = tắt tự xoá).
+Mặc định xoá file quá 30 ngày; đổi bằng biến môi trường OUTPUT_RETENTION_DAYS (0 = tắt tự xoá).
 """
 import logging
 import os
@@ -10,55 +10,58 @@ from pathlib import Path
 
 log = logging.getLogger("storage")   # giữ tên cũ cho log
 
-SO_NGAY_LUU_MAC_DINH = 30
+DEFAULT_RETENTION_DAYS = 30
 
 
-def so_ngay_luu() -> int:
+# Số ngày giữ PDF đã xuất
+def retention_days() -> int:
     """Số ngày giữ PDF đã xuất. Trống/sai -> 30; '0' -> tắt tự xoá."""
     try:
-        so = int(os.getenv("OUTPUT_RETENTION_DAYS", ""))
+        days = int(os.getenv("OUTPUT_RETENTION_DAYS", ""))
     except ValueError:
-        return SO_NGAY_LUU_MAC_DINH
-    return max(so, 0)
+        return DEFAULT_RETENTION_DAYS
+    return max(days, 0)
 
 
-def don_file_het_han(thu_muc: Path, so_ngay: int, bay_gio: float | None = None) -> list[Path]:
-    """Xoá file .pdf trong `thu_muc` (KHÔNG đi vào thư mục con) có lần sửa cuối quá `so_ngay` ngày.
+# Xoá PDF quá hạn trong thư mục output
+def delete_expired_files(folder: Path, days: int, now: float | None = None) -> list[Path]:
+    """Xoá file .pdf trong `folder` (KHÔNG đi vào thư mục con) có lần sửa cuối quá `days` ngày.
 
-    Trả danh sách file đã xoá. so_ngay <= 0 hoặc thư mục không tồn tại -> không làm gì.
+    Trả danh sách file đã xoá. days <= 0 hoặc thư mục không tồn tại -> không làm gì.
     Lỗi xoá một file (đang mở, không có quyền) chỉ ghi log, không chặn các file khác.
     """
-    if so_ngay <= 0 or not thu_muc.is_dir():
+    if days <= 0 or not folder.is_dir():
         return []
-    han = (bay_gio if bay_gio is not None else time.time()) - so_ngay * 86400
-    da_xoa = []
-    for f in thu_muc.iterdir():
-        if f.is_file() and f.suffix.lower() == ".pdf" and f.stat().st_mtime < han:
+    cutoff = (now if now is not None else time.time()) - days * 86400
+    deleted = []
+    for f in folder.iterdir():
+        if f.is_file() and f.suffix.lower() == ".pdf" and f.stat().st_mtime < cutoff:
             try:
                 f.unlink()
-                da_xoa.append(f)
+                deleted.append(f)
             except OSError:
-                log.exception("Không xoá được một file hết hạn trong %s", thu_muc)
-    if da_xoa:
+                log.exception("Không xoá được một file hết hạn trong %s", folder)
+    if deleted:
         # Chỉ ghi số lượng — tên file là họ tên ứng viên (S6)
-        log.info("Đã xoá %d hồ sơ PDF quá %d ngày trong %s", len(da_xoa), so_ngay, thu_muc)
-    return da_xoa
+        log.info("Đã xoá %d hồ sơ PDF quá %d ngày trong %s", len(deleted), days, folder)
+    return deleted
 
 
-def duong_dan_khong_trung(thu_muc: Path, ten: str, bay_gio: float | None = None) -> Path:
+# Đường dẫn lưu không ghi đè file cũ
+def unique_path(folder: Path, name: str, now: float | None = None) -> Path:
     """Đường dẫn lưu bản sao không ghi đè file cũ (Q5).
 
     Chưa có file trùng -> giữ nguyên tên (đúng chuẩn đặt tên mục 3.6 SKILL.md).
     Đã có -> thêm hậu tố giờ: 'LH - CV … - 09112026 (143015).pdf'; trùng cả giờ -> thêm số đếm.
     """
-    dich = thu_muc / ten
-    if not dich.exists():
-        return dich
-    goc, duoi = dich.stem, dich.suffix
-    gio = time.strftime("%H%M%S", time.localtime(bay_gio if bay_gio is not None else time.time()))
-    dich = thu_muc / f"{goc} ({gio}){duoi}"
-    dem = 2
-    while dich.exists():
-        dich = thu_muc / f"{goc} ({gio}-{dem}){duoi}"
-        dem += 1
-    return dich
+    target = folder / name
+    if not target.exists():
+        return target
+    stem, ext = target.stem, target.suffix
+    clock = time.strftime("%H%M%S", time.localtime(now if now is not None else time.time()))
+    target = folder / f"{stem} ({clock}){ext}"
+    counter = 2
+    while target.exists():
+        target = folder / f"{stem} ({clock}-{counter}){ext}"
+        counter += 1
+    return target

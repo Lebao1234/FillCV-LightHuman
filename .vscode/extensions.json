@@ -1,0 +1,4 @@
+{
+  // Gợi ý cài khi mở dự án: hỗ trợ cú pháp Jinja cho services/pdf/template.html
+  "recommendations": ["wholroyd.jinja"]
+}

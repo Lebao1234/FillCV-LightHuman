@@ -1,8 +1,0 @@
-Hôm nay: {hom_nay}
-Dự án: {du_an}
-Vị trí: {vi_tri}
-Hãy trích xuất CV này theo schema.
----
-# Chữ thay thế khi người dùng để trống (mỗi dòng: tên = nội dung)
-khong_co_du_an = (không có)
-khong_co_vi_tri = (không có — lấy theo chức danh mục tiêu trên CV)

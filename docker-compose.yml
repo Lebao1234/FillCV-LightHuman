@@ -1,0 +1,48 @@
+# Hồ sơ ứng viên – Light Human (Docker)
+# Chạy: docker compose up -d
+# Truy cập: http://localhost:8501
+
+services:
+  app:
+    build: .
+    container_name: fillcv-lighthuman
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    volumes:
+      # Giữ PDF đã xuất và log giữa các lần chạy
+      - ./data/output:/app/data/output
+      - ./data/logs:/app/data/logs
+      # Đổi cấu hình công ty / từ khoá mà không cần build lại
+      - ./config:/app/config:ro
+      - ./assets:/app/assets:ro
+    environment:
+      # Bộ trích xuất: "rules" (đọc PDF theo luật) hoặc "manual" (nhập tay)
+      - CV_EXTRACTOR=rules
+      # Hàng đợi
+      - RENDER_MAX_CONCURRENT=2
+      - EXTRACT_MAX_CONCURRENT=2
+      # Tự xoá PDF sau N ngày (0 = không xoá)
+      - OUTPUT_RETENTION_DAYS=30
+    mem_limit: 4g
+    # Chromium cần shared memory lớn hơn mặc định Docker (64MB)
+    shm_size: 512m
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # (Tuỳ chọn) Cloudflare Tunnel — mở app cho mạng, có xác thực qua Cloudflare Access
+  # Bỏ comment phần dưới và điền TUNNEL_TOKEN để dùng
+  #
+  # tunnel:
+  #   image: cloudflare/cloudflared:latest
+  #   container_name: fillcv-tunnel
+  #   restart: unless-stopped
+  #   command: tunnel run
+  #   environment:
+  #     - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+  #   depends_on:
+  #     - app
+

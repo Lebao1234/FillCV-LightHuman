@@ -1,0 +1,269 @@
+# Bảng từ khoá cho bộ đọc CV theo luật (services/extraction/rules/). Muốn nhận thêm một cách viết: thêm vào đây.
+# Mọi từ khoá viết KHÔNG DẤU, chữ thường (bộ đọc bỏ dấu + hạ chữ trước khi so khớp). Không ghi dữ liệu ứng viên.
+# Đổi file này -> phiên bản bộ đọc (metadata PDF) đổi theo mã băm.
+
+version = "1"
+
+# ---------------------------------------------------------------------------
+# Tiêu đề mục: [headings.<khoá>] type = loại mục theo schema; vi/en = các cách viết
+# type "personal" = khối thông tin cá nhân (không thành mục trong PDF, chỉ lấy năm sinh/giới tính/mong muốn)
+# type "auto" = chọn theo nội dung (có mốc thời gian -> experience, không -> bullets)
+# ---------------------------------------------------------------------------
+[headings.summary]
+type = "text"
+vi = ["muc tieu nghe nghiep", "muc tieu cong viec", "muc tieu", "gioi thieu ban than", "gioi thieu", "tom tat",
+      "tom tat ban than", "tong quan", "ve toi", "dinh huong nghe nghiep", "thong tin chung", "tom tat nang luc",
+      "tom tat kinh nghiem"]
+en = ["career objective", "objective", "objectives", "summary", "professional summary", "profile", "about me",
+      "career summary", "personal profile"]
+
+[headings.highlights]
+type = "bullets"
+vi = ["thanh tich noi bat", "diem noi bat", "thanh tuu", "thanh tich", "giai thuong", "danh hieu",
+      "giai thuong va thanh tich", "thanh tich va giai thuong"]
+en = ["key achievements", "achievements", "highlights", "awards", "honors", "honors and awards"]
+
+[headings.competencies]
+type = "bullets"
+vi = ["nang luc cot loi", "nang luc chuyen mon", "nang luc", "diem manh", "the manh"]
+en = ["core competencies", "competencies", "strengths", "key strengths"]
+
+[headings.skills]
+type = "bullets"
+vi = ["ky nang", "ky nang chuyen mon", "ky nang mem", "cac ky nang", "ky nang lam viec", "ky nang va cong cu",
+      "ky nang khac", "ky nang ca nhan"]
+en = ["skills", "key skills", "soft skills", "professional skills", "skills and tools"]
+
+[headings.tools]
+type = "tags"
+vi = ["tin hoc", "cong cu", "phan mem", "cong nghe", "tin hoc van phong", "cong cu phan mem", "ky nang tin hoc"]
+en = ["tools", "software", "it skills", "technical skills", "computer skills"]
+
+[headings.languages]
+type = "bullets"
+vi = ["ngoai ngu", "ngon ngu", "trinh do ngoai ngu"]
+en = ["languages", "language skills", "foreign languages"]
+
+[headings.career_path]
+type = "career_path"
+vi = ["lo trinh su nghiep", "lo trinh nghe nghiep", "lo trinh thang tien"]
+en = ["career path", "career progression"]
+
+[headings.experience]
+type = "experience"
+vi = ["kinh nghiem lam viec", "kinh nghiem", "qua trinh lam viec", "qua trinh cong tac", "lich su lam viec",
+      "kinh nghiem chuyen mon", "qua trinh cong viec"]
+en = ["work experience", "experience", "employment history", "professional experience", "working experience",
+      "work history", "employment"]
+
+[headings.projects]
+type = "auto"
+vi = ["du an", "du an tieu bieu", "du an da tham gia", "du an da thuc hien"]
+en = ["projects", "key projects", "project experience"]
+
+[headings.education]
+type = "education"
+vi = ["hoc van", "trinh do hoc van", "qua trinh hoc tap", "dao tao", "hoc van va dao tao", "trinh do chuyen mon",
+      "hoc van va chung chi", "hoc van - chung chi", "trinh do hoc van va qua trinh hoc tap",
+      "chung chi va dao tao", "dao tao va chung chi", "bang cap", "chung chi", "chung chi - bang cap",
+      "bang cap - chung chi", "bang cap va chung chi", "chung chi va bang cap", "khoa hoc", "cac khoa hoc"]
+en = ["education", "academic background", "education and training", "certifications", "certificates",
+      "licenses and certifications", "education and certifications", "courses", "training"]
+
+[headings.activities]
+type = "bullets"
+vi = ["hoat dong", "hoat dong ngoai khoa", "hoat dong xa hoi", "hoat dong tinh nguyen"]
+en = ["activities", "extracurricular activities", "volunteer", "volunteering"]
+
+[headings.interests]
+type = "bullets"
+vi = ["so thich", "so thich ca nhan"]
+en = ["interests", "hobbies"]
+
+[headings.other]
+type = "bullets"
+vi = ["thong tin them", "thong tin khac", "thong tin bo sung"]
+en = ["additional information", "other information"]
+
+[headings.references]
+type = "references"
+vi = ["nguoi tham chieu", "nguoi tham khao", "tham chieu", "nguoi gioi thieu"]
+en = ["references", "reference"]
+
+# Mục "công việc mong muốn" (vị trí, hình thức, nơi làm, lương mong muốn) -> dòng "Mong muốn", không thành mục
+[headings.desired]
+type = "personal"
+vi = ["cong viec mong muon", "thong tin cong viec mong muon", "nguyen vong", "nguyen vong cong viec",
+      "mong muon cong viec", "vi tri mong muon", "vi tri ung tuyen"]
+en = ["desired job", "type of job", "job expectation", "job expectations", "career expectation", "desired position"]
+
+[headings.personal]
+type = "personal"
+vi = ["thong tin ca nhan", "thong tin lien he", "lien he", "thong tin lien lac", "ho so ca nhan"]
+en = ["personal information", "personal details", "contact", "contact information", "contact details",
+      "personal info"]
+
+# ---------------------------------------------------------------------------
+# Nhãn trong khối thông tin cá nhân ("Nhãn: nội dung" hoặc nhãn một dòng, nội dung dòng sau)
+# ---------------------------------------------------------------------------
+[labels]
+# Xoá hẳn; ghi vào model_notes.removed theo tên loại (giá trị bên trái dấu "=" trong bảng removed_kind)
+remove = ["dien thoai", "dt", "sdt", "so dien thoai", "di dong", "so di dong", "phone", "mobile", "tel",
+          "telephone", "cell", "hotline", "email", "e-mail", "mail", "zalo", "facebook", "fb", "linkedin", "skype",
+          "telegram", "instagram", "tiktok", "website", "web", "portfolio", "github", "behance", "blog",
+          "dia chi", "dia chi lien he", "dia chi lien lac", "dia chi thuong tru", "dia chi tam tru", "noi o",
+          "cho o", "cho o hien tai", "noi o hien tai", "noi o hien nay", "address", "current address",
+          "home address", "que quan", "nguyen quan", "que", "ho khau", "ho khau thuong tru", "thuong tru",
+          "tam tru", "noi sinh", "place of birth", "hometown", "tinh trang hon nhan", "hon nhan",
+          "tinh trang gia dinh", "gia dinh", "marital status", "quoc tich", "nationality", "dan toc", "ton giao",
+          "cmnd", "cccd", "so cmnd", "so cccd", "cmnd/cccd", "can cuoc", "can cuoc cong dan", "id",
+          "passport", "ho chieu", "chieu cao", "can nang", "height", "weight", "suc khoe"]
+birth = ["ngay sinh", "nam sinh", "sinh ngay", "ngay thang nam sinh", "dob", "date of birth", "birthday",
+         "birth date", "year of birth", "ns"]
+gender = ["gioi tinh", "gender", "sex"]
+salary = ["muc luong mong muon", "luong mong muon", "muc luong", "luong", "muc luong de xuat",
+          "thu nhap mong muon", "expected salary", "salary expectation", "desired salary", "salary"]
+current_salary = ["luong hien tai", "muc luong hien tai", "thu nhap hien tai", "current salary"]
+title = ["chuc danh", "chuc vu", "vi tri hien tai", "chuc vu hien tai", "current position", "title", "vi tri"]
+# Gộp thành một dòng "Mong muốn: ... · ... · ..." trong khối nhận diện
+wish = ["mong muon", "nguyen vong", "vi tri mong muon", "vi tri ung tuyen", "vi tri du tuyen", "cong viec mong muon", "desired position",
+        "position applied", "applying for", "hinh thuc lam viec", "loai hinh cong viec", "hinh thuc",
+        "noi lam viec mong muon", "dia diem lam viec", "khu vuc lam viec", "noi lam viec", "working location",
+        "preferred location", "cap bac mong muon", "nganh nghe mong muon", "thoi gian lam viec",
+        "thoi gian co the bat dau", "co the bat dau"]
+
+# Họ tên ghi bằng nhãn ("Họ & tên / Full name: ...") — ưu tiên hơn dòng chữ to nhất
+name = ["ho ten", "ho va ten", "ho & ten", "ho va ten ung vien", "ten ung vien", "full name", "candidate name", "name"]
+# Bỏ im lặng trong khối thông tin cá nhân / công việc mong muốn (không phải thông tin nhạy cảm, cũng không cần giữ)
+ignore = ["nganh nghe", "nganh nghe mong muon", "career", "linh vuc", "cap bac hien tai", "current level", "cap bac",
+          "so nam kinh nghiem", "years of experience", "experience of year", "experience", "kinh nghiem"]
+
+# Tên loại ghi vào model_notes.removed (không ghi nội dung)
+[removed_kind]
+phone = ["dien thoai", "dt", "sdt", "so dien thoai", "di dong", "so di dong", "phone", "mobile", "tel",
+         "telephone", "cell", "hotline"]
+email = ["email", "e-mail", "mail"]
+social = ["zalo", "facebook", "fb", "linkedin", "skype", "telegram", "instagram", "tiktok"]
+link = ["website", "web", "portfolio", "github", "behance", "blog"]
+address = ["dia chi", "dia chi lien he", "dia chi lien lac", "dia chi thuong tru", "dia chi tam tru", "noi o", "cho o",
+           "cho o hien tai", "noi o hien tai", "noi o hien nay", "address", "current address", "home address",
+           "tam tru"]
+hometown = ["que quan", "nguyen quan", "que", "ho khau", "ho khau thuong tru", "thuong tru", "noi sinh",
+            "place of birth", "hometown"]
+marital = ["tinh trang hon nhan", "hon nhan", "tinh trang gia dinh", "gia dinh", "marital status"]
+nationality = ["quoc tich", "nationality", "dan toc", "ton giao"]
+id = ["cmnd", "cccd", "so cmnd", "so cccd", "cmnd/cccd", "can cuoc", "can cuoc cong dan", "id", "passport",
+      "ho chieu"]
+body = ["chieu cao", "can nang", "height", "weight", "suc khoe"]
+
+[removed_names]
+phone = "Số điện thoại"
+email = "Email"
+social = "Tài khoản mạng xã hội (Zalo/Facebook/LinkedIn...)"
+link = "Đường link (website/portfolio)"
+address = "Địa chỉ nhà"
+hometown = "Quê quán / nơi sinh / hộ khẩu"
+marital = "Tình trạng hôn nhân"
+nationality = "Quốc tịch / dân tộc / tôn giáo"
+id = "Số CMND/CCCD/hộ chiếu"
+body = "Chiều cao / cân nặng / sức khoẻ"
+birth = "Ngày sinh đầy đủ (chỉ giữ năm sinh)"
+current_salary = "Lương hiện tại"
+
+# ---------------------------------------------------------------------------
+# Trong mục kinh nghiệm
+# ---------------------------------------------------------------------------
+[experience]
+# Dòng "Nhãn: nội dung" có nhãn thuộc danh sách này -> dòng phụ (meta) của công việc
+meta_labels = ["linh vuc", "nganh", "nganh nghe", "linh vuc hoat dong", "du an", "quy mo", "quy mo cong ty",
+               "dia chi cong ty", "san pham", "khach hang", "bao cao cho", "bao cao truc tiep", "cap tren",
+               "quan ly", "so nhan su", "doi ngu", "team", "industry", "project", "company size", "reporting to",
+               "report to", "team size", "website cong ty", "loai hinh"]
+# Dòng kết thúc bằng ":" hoặc nhãn thuộc danh sách này -> tiêu đề nhóm việc
+group_labels = ["mo ta cong viec", "cong viec chinh", "nhiem vu", "nhiem vu chinh", "trach nhiem", "cong viec",
+                "thanh tich", "thanh tuu", "ket qua", "ket qua dat duoc", "thanh tich dat duoc", "dong gop",
+                "responsibilities", "duties", "achievements", "key achievements", "job description", "tasks"]
+# Dòng "Nhãn: nội dung" có nhãn thuộc danh sách này -> chức danh của công việc / vị trí con
+role_labels = ["vi tri", "chuc danh", "chuc vu", "vai tro", "vi tri cong viec", "position", "title", "role",
+               "job title"]
+# "Lộ trình thăng tiến: A (2019) → B (2021)" — công việc chưa có chức danh -> lấy bước cuối làm chức danh
+progression_labels = ["lo trinh thang tien", "lo trinh", "thang tien", "qua trinh thang tien", "career progression",
+                      "promotion", "promotions"]
+# Có trong một cụm chữ -> cụm đó là tên công ty
+company_words = ["cong ty", "cty", "ctcp", "tnhh", "co phan", "tap doan", "ngan hang", "chi nhanh", "van phong",
+                 "truong dai hoc", "truong cao dang", "benh vien", "group", "corp", "corporation", "company", "ltd", "jsc", "inc",
+                 "bank", "llc", "limited", "joint stock", "holdings", "vietnam", "viet nam"]
+# Có trong chức danh -> vị trí quản lý (dùng cho lưu ý tuyển dụng)
+manager_words = ["truong phong", "pho phong", "truong nhom", "truong bo phan", "giam doc", "pho giam doc",
+                 "quan ly", "ke toan truong", "manager", "head", "lead", "leader", "director", "supervisor",
+                 "chief"]
+# Có trong một cụm chữ ở phần đầu công việc -> cụm đó là chức danh (không phải công ty / dòng mô tả)
+role_words = ["ke toan", "nhan vien", "chuyen vien", "truong", "pho", "giam doc", "quan ly", "tro ly", "thuc tap",
+              "thu ky", "ky su", "lap trinh", "kiem toan", "thu quy", "giao vien", "tu van", "dieu phoi", "dai dien",
+              "manager", "executive", "specialist", "officer", "assistant", "intern", "engineer", "developer",
+              "analyst", "consultant", "leader", "lead", "director", "accountant", "coordinator", "supervisor",
+              "representative", "staff", "head", "chief", "admin", "sales", "marketing", "designer", "auditor"]
+senior_words = ["senior", "sr", "chuyen vien cao cap", "truong phong", "manager", "head", "director",
+                "giam doc", "ke toan truong", "chief"]
+
+# ---------------------------------------------------------------------------
+# Học vấn: [tên bậc, từ khoá, tên tiếng Anh]; thứ tự = bậc tăng dần (dùng cho ô số liệu "Trình độ")
+# ---------------------------------------------------------------------------
+[education]
+degree_levels = [
+  ["Chứng chỉ", ["chung chi", "certificate", "certification"], "Certificate"],
+  ["Trung cấp", ["trung cap", "intermediate"], "Vocational"],
+  ["Cao đẳng", ["cao dang", "college", "associate"], "Associate"],
+  ["Cử nhân", ["cu nhan", "bachelor", "dai hoc", "university", "ky su", "engineer"], "Bachelor"],
+  ["Thạc sĩ", ["thac si", "master", "mba", "msc"], "Master"],
+  ["Tiến sĩ", ["tien si", "phd", "doctor"], "PhD"],
+]
+chief_accountant_cert = ["chung chi ke toan truong", "boi duong ke toan truong", "ke toan truong"]
+# Tên VĂN BẰNG (để chọn phần làm tên bằng) và tên TRƯỜNG (để đưa sang phần chi tiết) trong một dòng học vấn
+degree_words = ["cu nhan", "ky su", "thac si", "tien si", "bang", "van bang", "chung chi", "chung nhan", "bang tot nghiep",
+                "trung cap", "cao dang", "bachelor", "master", "mba", "msc", "bsc", "phd", "doctor", "engineer",
+                "diploma", "degree", "certificate", "certification", "associate"]
+# Nhãn trong mục học vấn: văn bằng / chuyên ngành / trường
+degree_labels = ["bang cap", "bang cap cao nhat", "trinh do", "trinh do cao nhat", "hoc vi", "van bang", "xep loai",
+                 "degree", "highest degree", "qualification"]
+major_labels = ["chuyen nganh", "nganh", "nganh hoc", "nganh dao tao", "major", "specialization", "speciality"]
+school_labels = ["truong", "noi dao tao", "co so dao tao", "noi hoc", "school", "university", "institution"]
+# Từ nối "<văn bằng> tại <trường>"
+at_words = ["tại", "at"]          # so khớp nguyên văn (có dấu) — "tai" không dấu trùng "tài"
+school_words = ["dai hoc", "truong", "hoc vien", "vien", "university", "college", "institute", "academy", "school",
+                "trung tam", "center", "centre"]
+
+# ---------------------------------------------------------------------------
+# CV dịch theo từng dòng (mỗi dòng tiếng Việt có dòng / phần "/ ..." tiếng Anh dịch lại) -> bỏ phần tiếng Anh
+# Một dòng/phần KHÔNG có dấu tiếng Việt được coi là tiếng Anh khi có các từ dưới đây.
+# ---------------------------------------------------------------------------
+[translation]
+en_words = ["the", "and", "of", "for", "with", "from", "by", "or", "is", "are", "was", "were", "been", "has", "have",
+            "had", "this", "that", "these", "those", "which", "who", "our", "my", "their", "his", "her", "its", "all",
+            "other", "others", "each", "any", "some", "such", "into", "within", "under", "over", "about", "after",
+            "before", "during", "between", "through", "including", "per", "via", "job", "jobs", "work", "working",
+            "works", "main", "task", "tasks", "duty", "duties", "responsible", "responsibility", "responsibilities",
+            "company", "companies", "limited", "joint", "stock", "corporation", "university", "college", "institute",
+            "degree", "bachelor", "master", "major", "year", "years", "month", "months", "report", "reports",
+            "reporting", "management", "manage", "managing", "staff", "department", "accounting", "accountant",
+            "finance", "financial", "tax", "data", "process", "processing", "prepare", "preparing", "check",
+            "checking", "control", "monitor", "monitoring", "support", "supporting", "ensure", "make", "making",
+            "skills", "skill", "office", "information", "experience", "level", "current", "highest", "details",
+            "type", "place", "career", "objective", "salary", "full", "female", "male", "single", "married",
+            "name", "sex", "date", "birth", "nationality", "marital", "status", "address", "phone", "title",
+            "position", "location", "head", "chief", "general", "branch", "director", "board", "team", "plan",
+            "planning", "analysis", "analyze", "cash", "flow", "cost", "costs", "profit", "revenue", "budget",
+            "purchase", "customer", "customers", "supplier", "suppliers", "bank", "banks", "audit", "auditing",
+            "documents", "records", "monthly", "quarterly", "annually", "annual", "daily", "weekly", "related",
+            "relevant", "required", "request", "requests", "according", "regulations", "regulation", "state",
+            "agencies", "agency", "authorities", "independent", "good", "ability", "able", "communication",
+            "problem", "problems", "solving", "confident", "summary", "environment", "professional", "development",
+            "long", "term", "want", "wish", "suitable", "benefits", "employee", "employees", "official", "city",
+            "province", "district", "ward", "vietnam", "students", "student", "graduated", "certificate"]
+# Từ yếu (cũng hay gặp trong tiếng Việt viết không dấu) — tính nửa điểm
+weak_words = ["a", "an", "to", "in", "on", "at", "as", "be"]
+# Ô chỉ gồm năm + các từ này ("2012 year:") là bản dịch của ô ngày tháng -> bỏ cả ô
+date_words = ["year", "years", "from", "to", "since", "until", "present", "now", "time", "date"]
+# Nhãn cột thời gian lặp lại ở đầu dòng ("From time – To time CÔNG TY ...") -> bỏ phần nhãn (dấu gạch bất kỳ)
+range_labels = ["from time - to time", "from date - to date", "from - to", "tu ngay - den ngay",
+                "tu thang - den thang", "thoi gian tu - den", "tu - den"]

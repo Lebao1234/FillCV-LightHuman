@@ -6,7 +6,7 @@ Hiện tại app không có đăng nhập; an toàn vì chỉ mở trên `localh
 qua mạng.
 
 | Phương án | Cách làm | Ưu | Nhược | Công sức |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | **A. Reverse proxy có xác thực** (khuyên dùng trước) | Caddy/Nginx basic auth, hoặc Cloudflare Access / oauth2-proxy đặt trước app; app vẫn ở localhost | Không sửa code; tách bạch bảo mật khỏi app | Cần máy chủ/hạ tầng; phân quyền thô (vào được hay không) | S — vài giờ hạ tầng |
 | **B. Đăng nhập trong app** (`st.login`, OIDC Google Workspace / Microsoft 365) | Cấu hình `.streamlit/secrets.toml`, chỉ cho email trong danh sách | Đăng nhập bằng tài khoản công ty; biết ai làm hồ sơ nào (ghi vào log) | Cần tài khoản OIDC; sửa app + test | M — 0,5–1 ngày |
 | C. Mật khẩu chung | 1 mật khẩu trong secrets, so sánh an toàn | Nhanh nhất | Không biết ai dùng; lộ mật khẩu là lộ hết | S — 1–2 giờ |
@@ -17,7 +17,7 @@ bằng danh sách email theo vai trò.
 ## 2. CI chạy test mỗi lần commit
 
 | Phương án | Cách làm | Công sức |
-|---|---|---|
+| --- | --- | --- |
 | **GitHub Actions** (khuyên dùng khi repo lên GitHub) | `windows-latest`, cài `requirements-dev.txt` + `playwright install chromium`; push: `pytest -m "not slow"` (~20 s), pull request: toàn bộ + báo cáo độ phủ | S — ~2 giờ |
 | Hook trước commit trên máy | `pre-commit` chạy `pytest -m "not slow"` trước mỗi commit | S — <1 giờ |
 

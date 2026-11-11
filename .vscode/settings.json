@@ -1,0 +1,7 @@
+{
+  // Template PDF là Jinja, không phải HTML thường -> tô màu đúng cú pháp Jinja,
+  // VS Code không còn kiểm tra biểu thức {{ ... }} trong thẻ style như CSS.
+  "files.associations": {
+    "**/services/pdf/*.html": "jinja-html"
+  }
+}
