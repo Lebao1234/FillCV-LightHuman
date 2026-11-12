@@ -215,7 +215,7 @@ jobs:
       - name: Chuẩn hóa tên ảnh (GHCR bắt buộc chữ thường)
         run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       - name: Build ảnh để kiểm tra
         uses: docker/build-push-action@v6
