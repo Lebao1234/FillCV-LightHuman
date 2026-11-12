@@ -1,6 +1,6 @@
 """Thời hạn lưu hồ sơ PDF đã xuất (S2).
 
-File PDF trong data/output chứa họ tên + quá trình làm việc của ứng viên -> không giữ vô thời hạn.
+File PDF + JSON trong data/output chứa họ tên + quá trình làm việc của ứng viên -> không giữ vô thời hạn.
 Mặc định xoá file quá 30 ngày; đổi bằng biến môi trường OUTPUT_RETENTION_DAYS (0 = tắt tự xoá).
 """
 import logging
@@ -11,6 +11,8 @@ from pathlib import Path
 log = logging.getLogger("storage")   # giữ tên cũ cho log
 
 DEFAULT_RETENTION_DAYS = 30
+# Loại file xuất được dọn theo hạn: PDF + JSON hồ sơ lưu kèm
+EXPIRING_SUFFIXES = {".pdf", ".json"}
 
 
 # Số ngày giữ PDF đã xuất
@@ -25,7 +27,7 @@ def retention_days() -> int:
 
 # Xoá PDF quá hạn trong thư mục output
 def delete_expired_files(folder: Path, days: int, now: float | None = None) -> list[Path]:
-    """Xoá file .pdf trong `folder` (KHÔNG đi vào thư mục con) có lần sửa cuối quá `days` ngày.
+    """Xoá file .pdf/.json trong `folder` (KHÔNG đi vào thư mục con) có lần sửa cuối quá `days` ngày.
 
     Trả danh sách file đã xoá. days <= 0 hoặc thư mục không tồn tại -> không làm gì.
     Lỗi xoá một file (đang mở, không có quyền) chỉ ghi log, không chặn các file khác.
@@ -35,7 +37,7 @@ def delete_expired_files(folder: Path, days: int, now: float | None = None) -> l
     cutoff = (now if now is not None else time.time()) - days * 86400
     deleted = []
     for f in folder.iterdir():
-        if f.is_file() and f.suffix.lower() == ".pdf" and f.stat().st_mtime < cutoff:
+        if f.is_file() and f.suffix.lower() in EXPIRING_SUFFIXES and f.stat().st_mtime < cutoff:
             try:
                 f.unlink()
                 deleted.append(f)
@@ -43,7 +45,7 @@ def delete_expired_files(folder: Path, days: int, now: float | None = None) -> l
                 log.exception("Không xoá được một file hết hạn trong %s", folder)
     if deleted:
         # Chỉ ghi số lượng — tên file là họ tên ứng viên (S6)
-        log.info("Đã xoá %d hồ sơ PDF quá %d ngày trong %s", len(deleted), days, folder)
+        log.info("Đã xoá %d file hồ sơ (PDF/JSON) quá %d ngày trong %s", len(deleted), days, folder)
     return deleted
 
 

@@ -18,7 +18,7 @@
 |---|---|---|---|
 | File CV gốc (có SĐT, email, địa chỉ, ngày sinh, ảnh…) | Bộ nhớ phiên làm việc của app | Đến khi đóng trình duyệt / bấm "Làm mới" / app khởi động lại | Không ghi ra ổ đĩa |
 | File CV gốc (nội dung đầy đủ) | Bộ trích xuất chạy **ngay trên máy chủ của app** | Như dòng trên | Không gửi ra dịch vụ bên ngoài (xem mục 3) |
-| Hồ sơ PDF đã xuất (họ tên, năm sinh, quá trình làm việc — **đã bỏ** SĐT/email/địa chỉ/ngày sinh đầy đủ) | `data/output` trên máy chạy app | **Tự xoá sau 30 ngày** (`OUTPUT_RETENTION_DAYS`) | Bản gửi khách hàng |
+| Hồ sơ PDF + JSON đã xuất (họ tên, năm sinh, quá trình làm việc — **đã bỏ** SĐT/email/địa chỉ/ngày sinh đầy đủ) | `data/output` trên máy chạy app | **Tự xoá sau 30 ngày** (`OUTPUT_RETENTION_DAYS`) | Bản gửi khách hàng |
 | Lương mong muốn, ghi chú tuyển dụng | Chỉ hiển thị trong app và tin nhắn tóm tắt nội bộ | Như CV gốc | Không đưa vào PDF |
 | Log kỹ thuật | `data/logs` | Xoay vòng ~6 MB | **Không** chứa nội dung CV, họ tên hay tên file (tên file ghi dạng mã băm) |
 
@@ -49,8 +49,8 @@ Yêu cầu khi lấy đồng ý: rõ ràng, cụ thể, tự nguyện, lưu lạ
 
 | Yêu cầu | Cách làm với công cụ hiện tại |
 |---|---|
-| Xem / sửa dữ liệu | Hồ sơ PDF trong `data/output`; sửa bằng cách làm lại hồ sơ |
-| Xoá dữ liệu | Xoá file PDF của ứng viên trong `data/output` (hoặc chờ tự xoá 30 ngày); log không chứa dữ liệu cá nhân |
+| Xem / sửa dữ liệu | Hồ sơ PDF + file `.json` cùng tên trong `data/output` |
+| Xoá dữ liệu | Xoá file PDF và `.json` của ứng viên trong `data/output` (hoặc chờ tự xoá 30 ngày); log không chứa dữ liệu cá nhân |
 | Rút đồng ý | Ngừng làm hồ sơ; xoá PDF đã xuất; nếu đã gửi khách hàng thì thông báo theo quy trình của công ty |
 
 ## 6. Việc cần quyết định

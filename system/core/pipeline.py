@@ -10,6 +10,7 @@ import logging
 import tempfile
 import threading
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
@@ -25,6 +26,9 @@ from services.ai.models import CVData
 
 # Giữ tên logger "app" như trước khi tách file -> dòng log vẫn dạng "[run_id] app: ..."
 log = logging.getLogger("app")
+
+# Định danh + phiên bản cấu trúc file JSON lưu kèm PDF (đổi cấu trúc thì tăng số)
+EXPORT_FORMAT = "fillcv-lighthuman/export-1"
 
 
 # Lỗi đọc CV, thông điệp hiển thị cho người dùng
@@ -192,9 +196,11 @@ def make_pdf(cv: dict, project: str, position: str, photo: bytes | None,
 
 
 # Lưu bản sao PDF đã xuất, không ghi đè
-def save_copy(folder: Path, filename: str, pdf_bytes: bytes, run_id: str | None = None) -> Path:
+def save_copy(folder: Path, filename: str, pdf_bytes: bytes, run_id: str | None = None,
+              cv: dict | None = None, project: str = "", position: str = "") -> Path:
     """Lưu bản sao PDF đã xuất; trùng tên thì thêm hậu tố giờ (Q5), không ghi đè.
 
+    Có `cv` -> lưu kèm file .json cùng tên (hồ sơ đúng như lúc dựng PDF) để sau này sửa lại không phải đọc CV gốc.
     `run_id`: hàm này chạy trong callback của nút Tải — chạy TRƯỚC khi script kịp gắn run_id cho lượt chạy,
     nên phải gắn lại ở đây để dòng log mang đúng mã của hồ sơ.
     """
@@ -203,8 +209,28 @@ def save_copy(folder: Path, filename: str, pdf_bytes: bytes, run_id: str | None 
     folder.mkdir(parents=True, exist_ok=True)
     target = unique_path(folder, filename)
     target.write_bytes(pdf_bytes)
-    log.info("Đã lưu bản xuất vào thư mục output (%s)", "tên chuẩn" if target.name == filename else "thêm hậu tố giờ")
+    if cv is not None:
+        target.with_suffix(".json").write_text(export_json(cv, project, position), encoding="utf-8")
+    log.info("Đã lưu bản xuất vào thư mục output (%s%s)", "tên chuẩn" if target.name == filename else "thêm hậu tố giờ",
+             ", kèm JSON" if cv is not None else "")
     return target
+
+
+# Nội dung file JSON lưu kèm PDF
+def export_json(cv: dict, project: str, position: str) -> str:
+    """JSON lưu kèm PDF: thông tin lượt xuất + hồ sơ (đúng schema CVData, không có ảnh chân dung).
+
+    Hồ sơ nằm riêng trong khoá "cv" vì CVData cấm trường thừa; đọc lại thì lấy data["cv"] rồi CVData.model_validate.
+    """
+    record = {
+        "format": EXPORT_FORMAT,
+        "exported_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "extractor": extraction.extractor_version(),
+        "project": project,
+        "position": position,
+        "cv": cv,
+    }
+    return json.dumps(record, ensure_ascii=False, indent=2)
 
 
 # Đọc ô đúng/sai trong bảng chữ

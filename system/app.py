@@ -75,21 +75,22 @@ def make_pdf(cv: dict, fingerprint: str, slot=None) -> bool:
         ss.pdf_bytes = None
         add_message("assistant", kind="error", html=ui.error_message("Dựng PDF thất bại.", str(e)))
         return False
-    ss.pdf_bytes, ss.pdf_name, ss.checklist, ss.summary, ss.pdf_fingerprint = (
-        result.pdf_bytes, result.filename, result.checklist, result.summary, fingerprint)
+    ss.pdf_bytes, ss.pdf_name, ss.checklist, ss.summary, ss.pdf_fingerprint, ss.pdf_cv = (   # pdf_cv: hồ sơ lúc dựng
+        result.pdf_bytes, result.filename, result.checklist, result.summary, fingerprint, cv)
     return True
 
 
 # Callback nút Tải PDF: lưu bản sao + báo trong chat
 def save_export() -> None:
-    pipeline.save_copy(OUTPUT_DIR, ss.pdf_name, ss.pdf_bytes, run_id=ss.get("run_id"))
+    pipeline.save_copy(OUTPUT_DIR, ss.pdf_name, ss.pdf_bytes, run_id=ss.get("run_id"),
+                       cv=ss.get("pdf_cv"), project=ss.get("project") or "", position=ss.get("position") or "")
     add_message("assistant", html=ui.exported_message(ss.pdf_name))
 
 
 # Nút Làm mới: xoá hồ sơ và lịch sử chat
 def reset_chat() -> None:
     ss.update(dict.fromkeys(("cv0", "pending", "pdf_bytes", "pdf_fingerprint", "checklist", "summary", "photo",
-                             "review"), None), chat=[], auto_build=False, run=ss.run + 1)
+                             "review", "pdf_cv"), None), chat=[], auto_build=False, run=ss.run + 1)
 
 
 # Nhận CV người dùng gửi, đưa vào hàng chờ

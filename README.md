@@ -102,7 +102,7 @@ Truy cập `http://<máy chủ>/`. Trên máy chủ Linux, tạo sẵn `data/out
 
 ### Bước 3 — Tải PDF
 
-Tick 2 ô xác nhận → bấm **Tải PDF** (bản sao lưu vào `data/output`; trùng tên thì thêm hậu tố giờ, không ghi đè).
+Tick 2 ô xác nhận → bấm **Tải PDF** (bản sao PDF + file `.json` hồ sơ cùng tên lưu vào `data/output`; trùng tên thì thêm hậu tố giờ, không ghi đè).
 
 > **Nút Tải PDF bị khoá khi:** còn số điện thoại / email / link / ngày sinh (trong nội dung, tên dự án, vị trí hoặc trong chính file PDF), hồ sơ chưa hợp lệ, hoặc PDF chưa cập nhật theo nội dung mới — app sẽ chỉ ra chỗ cần sửa.
 
@@ -133,8 +133,8 @@ Không đặt = dùng mặc định. Dự án **không đọc** file `.env`.
 | `EXTRACT_QUEUE_TIMEOUT` | `300` | Giây chờ tối đa khi xếp hàng đọc CV |
 | `MAX_UPLOAD_MB` | `20` | Dung lượng tối đa file tải lên (phải khớp `server.maxUploadSize`) |
 | `MAX_CV_PAGES` | `20` | Số trang tối đa của CV PDF được đọc tự động và xem trước; dài hơn → khung nhập tay, tab CV gốc chỉ vẽ các trang đầu |
-| `OUTPUT_RETENTION_DAYS` | `30` | Số ngày giữ PDF đã xuất (`0` = không tự xoá) |
-| `OUTPUT_DIR` | `data/output` | Thư mục lưu bản sao PDF |
+| `OUTPUT_RETENTION_DAYS` | `30` | Số ngày giữ PDF + JSON đã xuất (`0` = không tự xoá) |
+| `OUTPUT_DIR` | `data/output` | Thư mục lưu bản sao PDF + JSON |
 | `LOG_DIR` | `data/logs` | Thư mục file log |
 | `LOGO_PATH` | `assets/logo.png` | Logo trong PDF |
 | `LOGO_HEADER_PATH` | `Logo.png` | Logo header (không có thì dùng logo PDF) |
@@ -195,7 +195,7 @@ app.py                  ← Điểm khởi chạy Streamlit
 │   ├── settings.py         Cấu hình chung (mặc định + biến môi trường)
 │   ├── tokens.py           Design tokens (màu, cỡ chữ, khoảng cách)
 │   ├── logging_setup.py    Cấu hình log + run_id + che tên file
-│   └── storage.py          Tự xoá PDF hết hạn, tên bản sao không ghi đè
+│   └── storage.py          Tự xoá PDF/JSON hết hạn, tên bản sao không ghi đè
 │
 └── config/ prompts/ assets/ tests/
 ```
