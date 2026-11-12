@@ -254,7 +254,7 @@ jobs:
       - name: Tạo tag
         id: meta
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images:
           tags: |
