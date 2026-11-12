@@ -73,11 +73,14 @@ Trình duyệt sẽ mở `http://localhost:8501`.
 **Chạy bằng Docker** (từ thư mục gốc repo; PDF đã xuất và log nằm ở `data/` của thư mục gốc). App chạy sau nginx (`nginx/conf.d/fillcv.conf`), nginx yêu cầu đăng nhập; cổng 8501 không mở ra ngoài.
 
 ```powershell
-# 1. Tạo tài khoản đăng nhập (lặp lại với ">>" để thêm người dùng)
-docker run --rm httpd:2.4-alpine htpasswd -nbB <tên> <mật-khẩu> > nginx/.htpasswd
+# 1. Tạo tài khoản đăng nhập. KHÔNG dùng ">" trong PowerShell 5.1 (ghi UTF-16, nginx không đọc được)
+docker run --rm httpd:2.4-alpine htpasswd -nbB <tên> <mật-khẩu> | Out-File -Encoding ascii nginx/.htpasswd
+#    Thêm người dùng: thay Out-File bằng  Add-Content -Encoding ascii nginx/.htpasswd
 # 2. Build + chạy
 docker compose up -d --build
 ```
+
+**Xem thử trên nền tảng một container** (snapdeploy, Render, Railway…): dùng `Dockerfile` ở thư mục gốc (đọc biến `PORT`, mặc định 1 lượt dựng PDF cho gói 512 MB RAM). Không có nginx/đăng nhập, không giữ file sau khi khởi động lại → **chỉ dùng CV giả**.
 
 Truy cập `http://<máy chủ>/`. Trên máy chủ Linux, tạo sẵn `data/output` và `data/logs` thuộc UID 1000 (`sudo chown -R 1000:1000 data`) để container ghi được. Đổi `MAX_UPLOAD_MB` thì đổi cả `client_max_body_size` trong cấu hình nginx.
 

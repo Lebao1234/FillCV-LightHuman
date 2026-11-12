@@ -1,0 +1,35 @@
+# Dùng cho Dockerfile ở thư mục gốc (context = cả repo). docker-compose.yml build system/ nên dùng system/.dockerignore.
+
+# Dữ liệu CV / xuất / sao lưu / mật khẩu — KHÔNG đưa vào image
+data/
+**/data/
+.backups/
+_backup/
+nginx/
+*.log
+.env
+**/.streamlit/secrets.toml
+
+# Git, IDE, công cụ
+.git/
+.github/
+.claude/
+.vscode/
+**/__pycache__/
+**/.pytest_cache/
+**/.coverage
+
+# Tài liệu, test, file chỉ dùng khi phát triển
+docs/
+README.md
+CLAUDE.md
+system/tests/
+system/requirements-dev.txt
+system/.coveragerc
+
+# Docker files
+Dockerfile
+system/Dockerfile
+docker-compose.yml
+.dockerignore
+system/.dockerignore

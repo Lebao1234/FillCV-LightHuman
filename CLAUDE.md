@@ -10,7 +10,7 @@ The user communicates in Vietnamese. Identifiers are English (PEP 8: functions, 
 
 ## Repo layout
 
-- Repo root: `README.md`, `CLAUDE.md`, `.gitignore`, `.vscode/`, `docker-compose.yml` (builds `./system`, mounts root `data/`; the app only `expose`s 8501, the `nginx` service publishes port 80 with basic auth), `nginx/conf.d/fillcv.conf` (reverse proxy: WebSocket `/_stcore/stream`, `client_max_body_size` ↔ `MAX_UPLOAD_MB`; `nginx/.htpasswd` is gitignored), `.github/` (CI workflow + dependabot), `docs/` (incl. `SKILL.md`), `data/` (never committed).
+- Repo root: `README.md`, `CLAUDE.md`, `.gitignore`, `.vscode/`, `docker-compose.yml` (builds `./system`, mounts root `data/`; the app only `expose`s 8501, the `nginx` service publishes port 80 with basic auth), root `Dockerfile` + `.dockerignore` (single-container PaaS preview, context = repo root, copies `system/`, honours `PORT`, no auth — keep its install steps in sync with `system/Dockerfile`; both install Chromium deps via `playwright install-deps` and only the headless shell), `nginx/conf.d/fillcv.conf` (reverse proxy: WebSocket `/_stcore/stream`, `client_max_body_size` ↔ `MAX_UPLOAD_MB`; `nginx/.htpasswd` is gitignored), `.github/` (CI workflow + dependabot), `docs/` (incl. `SKILL.md`), `data/` (never committed).
 - `system/`: all source code plus `Dockerfile`, `.dockerignore`, `requirements*.txt`, `.coveragerc`, `.streamlit/`, `tests/`. It is the Docker build context and the working directory for every Python command and CI job. Paths below (`infra/…`, `services/…`, `config/…`, `tests/…`) are relative to `system/`; `docs/…` is relative to the repo root.
 
 ## Commands
