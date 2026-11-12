@@ -11,8 +11,9 @@ import re
 import unicodedata
 from dataclasses import replace
 
-from services.extraction.rules import dates, rulebook
+from services.extraction.rules import rulebook
 from services.extraction.rules.pdf_text import Line, Span, _strip_bullet
+from services.extraction.rules import dates
 
 _VI = re.compile(r"[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]", re.IGNORECASE)
 _WORD = re.compile(r"[A-Za-z]+")

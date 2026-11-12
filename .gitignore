@@ -1,13 +1,19 @@
 # Bí mật và dữ liệu CV — KHÔNG đưa lên git
 .env
-.streamlit/secrets.toml
+**/.streamlit/secrets.toml
 data/
 
 # Sinh ra khi chạy / test
 __pycache__/
 .pytest_cache/
 .coverage
+coverage.xml
 *.log
 
 # Bản sao lưu tạm trong quá trình sửa
 _backup/
+.backups/
+
+# Mật khẩu / chứng chỉ của nginx
+nginx/.htpasswd
+nginx/certs/

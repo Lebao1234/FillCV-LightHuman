@@ -12,9 +12,11 @@ from datetime import date
 from pathlib import Path
 
 from infra import settings
-from services.extraction import base, manual
-from services.extraction.rules import analysis, content, personal, rulebook, sections, translation
+from services.extraction import manual
+from services.extraction.rules import translation
 from services.extraction.rules.pdf_text import Line, TextQualityError, TooManyPagesError, read_lines
+from services.extraction import base
+from services.extraction.rules import analysis, content, personal, rulebook, sections
 
 NOTE_AUTO = "Hồ sơ do bộ đọc tự động (theo luật) dựng từ PDF — đối chiếu với CV gốc trước khi gửi khách."
 

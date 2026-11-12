@@ -8,8 +8,9 @@ from collections import Counter
 from dataclasses import dataclass, field
 from statistics import median
 
-from services.extraction.rules import dates, rulebook
+from services.extraction.rules import rulebook
 from services.extraction.rules.pdf_text import Line
+from services.extraction.rules import dates
 
 MAX_HEADING_WORDS = 8
 

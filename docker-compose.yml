@@ -1,21 +1,24 @@
 # Hồ sơ ứng viên – Light Human (Docker)
-# Chạy: docker compose up -d
-# Truy cập: http://localhost:8501
+# Chạy (từ thư mục gốc repo): docker compose up -d --build
+# Truy cập: http://<máy chủ>/ (qua nginx, có đăng nhập). Cần tạo nginx/.htpasswd trước — xem README.
+# Mã nguồn + Dockerfile nằm trong system/; dữ liệu xuất/log nằm ở data/ của thư mục gốc.
 
 services:
   app:
-    build: .
+    build: ./system
     container_name: fillcv-lighthuman
     restart: unless-stopped
-    ports:
-      - "8501:8501"
+    # Chỉ mở trong mạng Docker cho nginx; KHÔNG publish 8501 ra máy chủ (app không có đăng nhập).
+    # Cần gỡ lỗi trực tiếp trên máy chủ thì thêm: ports: ["127.0.0.1:8501:8501"]
+    expose:
+      - "8501"
     volumes:
       # Giữ PDF đã xuất và log giữa các lần chạy
       - ./data/output:/app/data/output
       - ./data/logs:/app/data/logs
       # Đổi cấu hình công ty / từ khoá mà không cần build lại
-      - ./config:/app/config:ro
-      - ./assets:/app/assets:ro
+      - ./system/config:/app/config:ro
+      - ./system/assets:/app/assets:ro
     environment:
       # Bộ trích xuất: "rules" (đọc PDF theo luật) hoặc "manual" (nhập tay)
       - CV_EXTRACTOR=rules
@@ -33,8 +36,29 @@ services:
       timeout: 5s
       retries: 3
 
+  # Reverse proxy + đăng nhập (basic auth) phía trước app. Cấu hình: nginx/conf.d/fillcv.conf
+  nginx:
+    image: nginx:1.28-alpine
+    container_name: fillcv-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      # - "443:443"   # bật khi dùng HTTPS (xem cuối nginx/conf.d/fillcv.conf)
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/.htpasswd:/etc/nginx/.htpasswd:ro
+      # - ./nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/_stcore/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
   # (Tuỳ chọn) Cloudflare Tunnel — mở app cho mạng, có xác thực qua Cloudflare Access
-  # Bỏ comment phần dưới và điền TUNNEL_TOKEN để dùng
+  # Bỏ comment phần dưới và điền TUNNEL_TOKEN để dùng. Trên dashboard Cloudflare, trỏ service tới http://nginx:80
   #
   # tunnel:
   #   image: cloudflare/cloudflared:latest

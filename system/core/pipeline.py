@@ -132,7 +132,12 @@ def read_cv(data: bytes, filename: str, project: str, position: str,
         log.info("Giai đoạn %s: %.1f giây (%s) %s", st.key, st.seconds, st.status, st.detail)
     log.info("Đọc CV xong (%s): %d mục, %d cảnh báo, ảnh chân dung: %s", res.backend, len(cv["sections"]),
              len(res.warnings), "có" if photo else "không")
-    return ReadResult(cv, photo, list(res.warnings), dict(res.confidence), list(res.stages), res.backend)
+    warnings, confidence = list(res.warnings), dict(res.confidence)
+    if position.strip():     # người dùng nhập Vị trí -> ghi đè chức danh cào từ CV (dòng dưới họ tên trong PDF)
+        cv["target_title"] = position.strip()
+        confidence.pop("target_title", None)             # do người dùng nhập -> không còn nhãn "Cần xem"
+        warnings = [w for w in warnings if w.path != "target_title"]
+    return ReadResult(cv, photo, warnings, confidence, list(res.stages), res.backend)
 
 
 # ----- Hàng đợi dựng PDF (dùng chung cho MỌI phiên Streamlit — chúng chạy chung 1 tiến trình) -----

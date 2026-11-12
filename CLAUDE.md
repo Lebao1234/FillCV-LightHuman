@@ -4,13 +4,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Internal Streamlit web app for Light Human (Vietnamese recruitment agency): upload a candidate CV (PDF/image/DOCX) → an on-server extractor builds the profile JSON → staff review/edit → export a branded "Hồ sơ ứng viên" PDF with the candidate's contact details removed. **No external AI/API is called** (OpenAI was removed 11/2026; CV data must not leave the server). **`SKILL.md` is the business spec for the PDF** (layout, what to strip, naming `LH - CV <Vị trí> - <Họ tên> - <ddmmyyyy>.pdf`, checklist); the template and checks implement it. `docs/prompts/system_prompt.txt` (the last OpenAI prompt, archived) is the detailed extraction spec for the rule-based extractor. `docs/de_xuat_bo_openai.md` is the plan for replacing OpenAI (phase B: rule-based PDF parser + manual fallback).
+Internal Streamlit web app for Light Human (Vietnamese recruitment agency): upload a candidate CV (PDF/image/DOCX) → an on-server extractor builds the profile JSON → staff review/edit → export a branded "Hồ sơ ứng viên" PDF with the candidate's contact details removed. **No external AI/API is called** (OpenAI was removed 11/2026; CV data must not leave the server). **`docs/SKILL.md` is the business spec for the PDF** (layout, what to strip, naming `LH - CV <Vị trí> - <Họ tên> - <ddmmyyyy>.pdf`, checklist); the template and checks implement it. `docs/prompts/system_prompt.txt` (the last OpenAI prompt, archived) is the detailed extraction spec for the rule-based extractor. `docs/de_xuat_bo_openai.md` is the plan for replacing OpenAI (phase B: rule-based PDF parser + manual fallback).
 
 The user communicates in Vietnamese. Identifiers are English (PEP 8: functions, variables, classes, internal dict/session keys, `config/company.toml` keys, file names); user-facing strings, PDF text and comments/docstrings stay Vietnamese. Every function/class has a one-line Vietnamese `#` comment above it — keep that convention for new code.
+
+## Repo layout
+
+- Repo root: `README.md`, `CLAUDE.md`, `.gitignore`, `.vscode/`, `docker-compose.yml` (builds `./system`, mounts root `data/`; the app only `expose`s 8501, the `nginx` service publishes port 80 with basic auth), `nginx/conf.d/fillcv.conf` (reverse proxy: WebSocket `/_stcore/stream`, `client_max_body_size` ↔ `MAX_UPLOAD_MB`; `nginx/.htpasswd` is gitignored), `.github/` (CI workflow + dependabot), `docs/` (incl. `SKILL.md`), `data/` (never committed).
+- `system/`: all source code plus `Dockerfile`, `.dockerignore`, `requirements*.txt`, `.coveragerc`, `.streamlit/`, `tests/`. It is the Docker build context and the working directory for every Python command and CI job. Paths below (`infra/…`, `services/…`, `config/…`, `tests/…`) are relative to `system/`; `docs/…` is relative to the repo root.
 
 ## Commands
 
 ```powershell
+cd system                                         # every command below runs from system/
 python -m pip install -r requirements-dev.txt     # app deps (pinned) + pytest/coverage/python-docx
 python -m playwright install chromium             # required: PDFs are rendered by Chromium
 python -m streamlit run app.py                    # http://localhost:8501 — no .env needed
@@ -22,7 +28,7 @@ python -m services.extraction.rules.measure cv.pdf [--expect answer.json]   # pa
 python -m infra.tokens                            # print token tables to paste into docs/design-system.md
 ```
 
-Run everything from the repo root: the folders are implicit namespace packages (no `__init__.py`), and `render_worker` is launched with `-m` and `cwd=<root>`. There is no linter configured. On Windows, set `PYTHONIOENCODING=utf-8` when a script prints Vietnamese, or the console raises `UnicodeEncodeError`.
+Run everything from `system/` (`PROJECT_ROOT` in `infra/settings.py`): the folders are implicit namespace packages (no `__init__.py`), imports are written without a `system.` prefix, and `render_worker` is launched with `-m` and `cwd=PROJECT_ROOT`. CI (`.github/workflows/ci-cd-web-app.yml`) runs `ruff check .`; there is no ruff config file. On Windows, set `PYTHONIOENCODING=utf-8` when a script prints Vietnamese, or the console raises `UnicodeEncodeError`.
 
 Configuration: every value has a default in `infra/settings.py` (or `config/company.toml`) and can be overridden only by **OS environment variables** (`CV_EXTRACTOR`, `EXTRACT_MAX_CONCURRENT`, `EXTRACT_QUEUE_TIMEOUT`, `MAX_UPLOAD_MB`, `MAX_CV_PAGES`, `OUTPUT_DIR`, `LOG_DIR`, `OUTPUT_RETENTION_DAYS`, `RENDER_*`, `COMPANY_CONFIG`, `LOGO_PATH`, `LOGO_HEADER_PATH`, `CHROMIUM_NO_SANDBOX`). There is no `.env` / `python-dotenv`.
 

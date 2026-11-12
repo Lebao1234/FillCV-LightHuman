@@ -5,9 +5,10 @@ import re
 from dataclasses import dataclass, field, replace
 from datetime import date
 
-from services.extraction.rules import dates, rulebook
+from services.extraction.rules import rulebook
 from services.extraction.rules.pdf_text import Line, Span, marked_text
 from services.extraction.rules.sections import RawSection
+from services.extraction.rules import dates
 
 _LABEL = re.compile(r"^\s*([^:：\t]{1,40}?)\s*[:：]\s*(.*)$")
 _SPLIT = re.compile(r"\s*(?:\t+|\s\|\s|\|| [–—-] | · )\s*")

@@ -6,7 +6,8 @@
 import re
 from datetime import date
 
-from services.extraction.rules import dates, rulebook
+from services.extraction.rules import rulebook
+from services.extraction.rules import dates
 
 _VI_CHARS = re.compile(r"[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]", re.IGNORECASE)
 

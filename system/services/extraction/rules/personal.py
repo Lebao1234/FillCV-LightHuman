@@ -10,9 +10,10 @@
 import re
 from dataclasses import dataclass, field, replace
 
-from services.extraction.rules import content, dates, rulebook
+from services.extraction.rules import rulebook
 from services.extraction.rules.pdf_text import Line, Span
 from services.privacy import checks
+from services.extraction.rules import content, dates
 
 # Dòng trông như địa chỉ VN (số nhà/đường/phường/quận/thành phố) hoặc địa chỉ tiếng Anh
 ADDRESS = re.compile(

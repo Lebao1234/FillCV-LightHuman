@@ -37,7 +37,11 @@
 
 **Yêu cầu:** Python 3.13+, Windows
 
+Mã nguồn nằm trong thư mục `system/` — **mọi lệnh Python dưới đây chạy từ thư mục đó**:
+
 ```powershell
+cd system
+
 # Cài thư viện
 python -m pip install -r requirements.txt
 
@@ -60,10 +64,22 @@ python -m pip install -r requirements-dev.txt
 ## 🚀 Chạy
 
 ```powershell
+cd system
 python -m streamlit run app.py
 ```
 
 Trình duyệt sẽ mở `http://localhost:8501`.
+
+**Chạy bằng Docker** (từ thư mục gốc repo; PDF đã xuất và log nằm ở `data/` của thư mục gốc). App chạy sau nginx (`nginx/conf.d/fillcv.conf`), nginx yêu cầu đăng nhập; cổng 8501 không mở ra ngoài.
+
+```powershell
+# 1. Tạo tài khoản đăng nhập (lặp lại với ">>" để thêm người dùng)
+docker run --rm httpd:2.4-alpine htpasswd -nbB <tên> <mật-khẩu> > nginx/.htpasswd
+# 2. Build + chạy
+docker compose up -d --build
+```
+
+Truy cập `http://<máy chủ>/`. Trên máy chủ Linux, tạo sẵn `data/output` và `data/logs` thuộc UID 1000 (`sudo chown -R 1000:1000 data`) để container ghi được. Đổi `MAX_UPLOAD_MB` thì đổi cả `client_max_body_size` trong cấu hình nginx.
 
 ---
 
@@ -95,6 +111,8 @@ Tick 2 ô xác nhận → bấm **Tải PDF** (bản sao lưu vào `data/output`
 ## ⚙ Cấu hình
 
 ### File cấu hình
+
+Đường dẫn tính từ thư mục `system/`.
 
 | File | Nội dung |
 |---|---|
@@ -130,7 +148,18 @@ Không đặt = dùng mặc định. Dự án **không đọc** file `.env`.
 
 ## 🏗 Cấu trúc mã nguồn
 
-Mã chia **4 lớp**, mỗi lớp một thư mục; lớp trên gọi lớp dưới, **không gọi ngược**:
+Bố cục repo:
+
+```
+README.md  CLAUDE.md  .gitignore  .vscode/
+docker-compose.yml      ← Chạy app bằng Docker (build từ system/)
+.github/                ← CI/CD (workflows) + dependabot
+docs/                   ← Tài liệu, gồm SKILL.md (quy chuẩn hồ sơ PDF)
+data/                   ← PDF đã xuất + log khi chạy Docker (không đưa lên git)
+system/                 ← Mã nguồn, Dockerfile, requirements*.txt, .streamlit/, tests/
+```
+
+Trong `system/`, mã chia **4 lớp**, mỗi lớp một thư mục; lớp trên gọi lớp dưới, **không gọi ngược**:
 
 ```
 app.py                  ← Điểm khởi chạy Streamlit
@@ -168,10 +197,10 @@ app.py                  ← Điểm khởi chạy Streamlit
 │   ├── logging_setup.py    Cấu hình log + run_id + che tên file
 │   └── storage.py          Tự xoá PDF hết hạn, tên bản sao không ghi đè
 │
-└── config/ prompts/ assets/ docs/
+└── config/ prompts/ assets/ tests/
 ```
 
-> **Quy ước:** Định danh trong code (hàm, biến, lớp, key) đặt **tiếng Anh** theo PEP 8; chữ hiển thị cho người dùng, nội dung PDF và chú thích giữ **tiếng Việt**. Các thư mục là *namespace package* (không có `__init__.py`) — luôn chạy lệnh từ **thư mục gốc** dự án.
+> **Quy ước:** Định danh trong code (hàm, biến, lớp, key) đặt **tiếng Anh** theo PEP 8; chữ hiển thị cho người dùng, nội dung PDF và chú thích giữ **tiếng Việt**. Các thư mục là *namespace package* (không có `__init__.py`) — luôn chạy lệnh Python từ thư mục **`system/`**.
 
 ### Vì sao xuất PDF bằng tiến trình riêng?
 
@@ -260,7 +289,7 @@ python -m streamlit run app.py
 
 | Tài liệu | Mô tả |
 |---|---|
-| [`SKILL.md`](SKILL.md) | Quy chuẩn hồ sơ PDF (bố cục, thông tin bỏ/giữ, đặt tên file, checklist) |
+| [`docs/SKILL.md`](docs/SKILL.md) | Quy chuẩn hồ sơ PDF (bố cục, thông tin bỏ/giữ, đặt tên file, checklist) |
 | [`docs/design-system.md`](docs/design-system.md) | Hệ thống giao diện: design tokens, nguyên tắc màu sắc, cách đổi token |
 | [`docs/data-privacy-policy.md`](docs/data-privacy-policy.md) | Chính sách xử lý dữ liệu cá nhân ứng viên (bản nháp, chờ pháp chế) |
 | [`docs/proposals.md`](docs/proposals.md) | Đề xuất dài hạn: đăng nhập/phân quyền, CI, cải tiến khác |

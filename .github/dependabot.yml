@@ -1,0 +1,25 @@
+# Tự mở pull request khi có bản mới của thư viện, image Docker và action.
+version: 2
+updates:
+  # Thư viện Python (requirements*.txt nằm trong system/)
+  - package-ecosystem: pip
+    directory: /system
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    ignore:
+      # Bản 5.x đã bỏ Haar cascade mà app dùng để cắt ảnh chân dung
+      - dependency-name: opencv-python-headless
+        update-types: ["version-update:semver-major"]
+
+  # Image nền trong system/Dockerfile
+  - package-ecosystem: docker
+    directory: /system
+    schedule:
+      interval: weekly
+
+  # Các action dùng trong .github/workflows
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
