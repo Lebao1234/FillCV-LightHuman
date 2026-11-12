@@ -9,4 +9,4 @@ pillow==12.3.0
 pymupdf==2.1
 opencv-python-headless==4.14.0.94   # tìm khuôn mặt; KHÔNG dùng bản 5.x (đã bỏ Haar cascade)
 numpy==2.5.4                 # render.py dùng trực tiếp khi tìm khuôn mặt
-tzdata==2026.5               # Windows không có sẵn dữ liệu múi giờ cho zoneinfo ("Asia/Ho_Chi_Minh")
+tzdata==2026.6               # Windows không có sẵn dữ liệu múi giờ cho zoneinfo ("Asia/Ho_Chi_Minh")
