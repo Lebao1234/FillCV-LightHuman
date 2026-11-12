@@ -1,5 +1,5 @@
 # ---- Build stage: cài thư viện + Chromium ----
-FROM python:3.13-slim AS builder
+FROM python:3.15-slim AS builder
 
 # Thư viện hệ thống cần cho opencv-python-headless, PyMuPDF, Pillow
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -16,7 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt \
     && python -m playwright install --with-deps --only-shell chromium
 
 # ---- Runtime stage ----
-FROM python:3.13-slim
+FROM python:3.15-slim
 
 # Tạo user không phải root (bảo mật)
 RUN groupadd --gid 1000 appuser && useradd --uid 1000 --gid appuser --shell /bin/bash appuser
