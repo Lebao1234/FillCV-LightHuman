@@ -5,7 +5,7 @@ pydantic==2.14.1
 jinja2==3.1.6
 markupsafe==3.0.3            # render.py dùng trực tiếp (Markup, escape)
 playwright==1.64.1           # sau khi cài: python -m playwright install chromium
-pillow==12.3.0
+pillow==13.0.0
 pymupdf==2.1
 opencv-python-headless==4.14.0.94   # tìm khuôn mặt; KHÔNG dùng bản 5.x (đã bỏ Haar cascade)
 numpy==2.5.4                 # render.py dùng trực tiếp khi tìm khuôn mặt
