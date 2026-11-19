@@ -39,6 +39,7 @@ export default function App() {
 
   // Kết quả bản PDF
   const [pdfData, setPdfData] = useState(null)
+  const [currentFingerprint, setCurrentFingerprint] = useState('')
   const [summary, setSummary] = useState('')
 
   // Validation & Review
@@ -73,7 +74,7 @@ export default function App() {
 
   // Đánh giá trạng thái bản PDF qua backend
   const updatePdfStatus = useCallback(
-    async (currentCv, currentPdfData, isCheckedGen, isRev) => {
+    async (currentPdfData, curFingerprint, isCheckedGen, isRev, curViolations, curStructErrors) => {
       if (!currentPdfData) {
         setPdfStatus({
           outdated: false,
@@ -89,10 +90,10 @@ export default function App() {
         const res = await getPdfStatus({
           has_pdf: Boolean(currentPdfData.filename),
           pdf_fingerprint: currentPdfData.fingerprint,
-          current_fingerprint: currentPdfData.fingerprint, // Khớp ban đầu
+          current_fingerprint: curFingerprint || currentPdfData.fingerprint,
           checklist: currentPdfData.checklist,
-          has_violations: violations.length > 0,
-          has_structure_errors: structureErrors.length > 0,
+          has_violations: (curViolations || violations).length > 0,
+          has_structure_errors: (curStructErrors || structureErrors).length > 0,
           checked_generated: isCheckedGen,
           reviewed: isRev,
         })
@@ -101,15 +102,15 @@ export default function App() {
         console.error('Lỗi tính trạng thái PDF:', err)
       }
     },
-    [violations.length, structureErrors.length]
+    [violations, structureErrors]
   )
 
   // Cập nhật trạng thái khi các checkbox thay đổi
   useEffect(() => {
     if (pdfData) {
-      updatePdfStatus(cvData, pdfData, checkedGenerated, reviewed)
+      updatePdfStatus(pdfData, currentFingerprint, checkedGenerated, reviewed)
     }
-  }, [checkedGenerated, reviewed, pdfData, updatePdfStatus, cvData])
+  }, [checkedGenerated, reviewed, pdfData, currentFingerprint, updatePdfStatus])
 
   // Dựng PDF
   const handleBuildPdf = useCallback(
@@ -124,6 +125,7 @@ export default function App() {
           lang: targetLang,
         })
         setPdfData(res)
+        setCurrentFingerprint(res.fingerprint)
         setSummary(res.summary || '')
         setPdfStatus(res.status)
       } catch (err) {
@@ -172,6 +174,8 @@ export default function App() {
         if (labels && labels.length > 0) setStageLabels(labels)
       },
       onDone: (data) => {
+        const initialLang = data.cv.language || 'vi'
+        setPdfLang(initialLang)
         setIsExtracting(false)
         setRunId(data.run_id)
         setCvData(data.cv)
@@ -206,7 +210,7 @@ export default function App() {
         ])
 
         // Dựng PDF tự động lần đầu
-        handleBuildPdf(data.cv, data.run_id, prj, pos || data.cv.target_title || '', pdfLang)
+        handleBuildPdf(data.cv, data.run_id, prj, pos || data.cv.target_title || '', initialLang)
       },
       onError: (errMsg) => {
         setIsExtracting(false)
@@ -235,10 +239,16 @@ export default function App() {
   // Cập nhật nội dung hồ sơ và tự động validate
   const handleCvChange = (newCv) => {
     setCvData(newCv)
-    validateCv(newCv, project, position)
+    validateCv(newCv, project, position, runId, pdfLang)
       .then((val) => {
-        setStructureErrors(val.structure_errors || [])
-        setViolations(val.violations || [])
+        const structErrs = val.structure_errors || []
+        const viols = val.violations || []
+        setStructureErrors(structErrs)
+        setViolations(viols)
+        if (val.fingerprint) {
+          setCurrentFingerprint(val.fingerprint)
+          updatePdfStatus(pdfData, val.fingerprint, checkedGenerated, reviewed, viols, structErrs)
+        }
       })
       .catch((err) => console.error('Lỗi validate:', err))
   }

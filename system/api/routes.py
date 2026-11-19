@@ -195,16 +195,23 @@ async def validate_cv(request: Request) -> JSONResponse:
     cv = body.get("cv") or {}
     project = str(body.get("project") or "")
     position = str(body.get("position") or "")
+    run_id = str(body.get("run_id") or "")
+    lang = str(body.get("lang") or "vi")
 
     cv_normalized, structure_errors = pipeline.validate_structure(cv)
     active_cv = cv_normalized if not structure_errors else cv
     violations = checks.scan_pii_export(active_cv, project, position)
+
+    run = run_store.get(run_id) if run_id else None
+    photo = run.photo if run else None
+    fingerprint = pipeline.content_fingerprint(active_cv, project, position, photo, lang)
 
     return JSONResponse({
         "valid": not structure_errors and not violations,
         "structure_errors": structure_errors,
         "violations": violations,
         "normalized_cv": cv_normalized,
+        "fingerprint": fingerprint,
     })
 
 

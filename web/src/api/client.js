@@ -130,11 +130,11 @@ export function extractCv(file, project, position, { onWait, onProgress, onDone,
 }
 
 // Kiểm tra tính hợp lệ cấu trúc và rà soát PII
-export async function validateCv(cv, project = '', position = '') {
+export async function validateCv(cv, project = '', position = '', runId = '', lang = 'vi') {
   const res = await fetch(`${BASE_URL}/api/cv/validate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ cv, project, position }),
+    body: JSON.stringify({ cv, project, position, run_id: runId, lang }),
   })
   return handleJson(res)
 }

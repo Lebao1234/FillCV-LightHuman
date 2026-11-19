@@ -135,7 +135,8 @@ Mọi endpoint đều tuân thủ các quy tắc bảo mật từ [CLAUDE.md](fi
   "violations": [],
   "normalized_cv": {
     "full_name": "Nguyễn Văn A"
-  }
+  },
+  "fingerprint": "a1b2c3d4..."
 }
 ```
 * **Khi có lỗi:**
