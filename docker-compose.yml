@@ -2,13 +2,11 @@
 # Chạy (từ thư mục gốc repo): docker compose up -d --build
 # Truy cập: http://localhost/ (qua nginx). Đăng nhập basic auth ĐANG TẮT TẠM THỜI nên cổng 80 chỉ mở cho máy này;
 # bật lại: xem ghi chú trong nginx/conf.d/fillcv.conf và mục "Chạy bằng Docker" của README.
-# Mã nguồn + Dockerfile nằm trong system/; dữ liệu xuất/log nằm ở data/ của thư mục gốc.
+# Mã nguồn nằm trong system/ và web/; Dockerfile nằm ở gốc repo; dữ liệu xuất/log nằm ở data/ của thư mục gốc.
 
 services:
   app:
-    build:
-      context: .
-      dockerfile: system/Dockerfile
+    build: .
     container_name: fillcv-lighthuman
     restart: unless-stopped
     # Chỉ mở trong mạng Docker cho nginx; KHÔNG publish 8000 ra máy chủ (app không có đăng nhập).

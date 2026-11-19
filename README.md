@@ -187,8 +187,9 @@ Không đặt = dùng mặc định. Dự án **không đọc** file `.env`.
 Bố cục repo:
 
 ```
-README.md  CLAUDE.md  .gitignore  .vscode/
-docker-compose.yml      ← Chạy app bằng Docker (build multi-stage)
+README.md  CLAUDE.md  .gitignore  .dockerignore  .vscode/
+Dockerfile              ← Dockerfile duy nhất của dự án (multi-stage build)
+docker-compose.yml      ← Chạy app bằng Docker (build: .)
 .github/                ← CI/CD (workflows) + dependabot
 docs/                   ← Tài liệu: SKILL.md (quy chuẩn PDF), api.md (hợp đồng API)
 data/                   ← PDF đã xuất + log khi chạy (không đưa lên git)
@@ -200,7 +201,7 @@ Mã nguồn chia làm 2 tầng độc lập:
 
 1. **Frontend (`web/`)**:
    - `src/api/client.js`: Module duy nhất gọi API backend
-   - `src/components/`: Header, ChatPanel, OriginalCvPreview, PdfPanel, StatusBar, StageScreen
+   - `src/components/`: Header, ExtractionPanel (tiến trình bóc tách & dashboard), OriginalCvPreview, PdfPanel, StatusBar, StageScreen
    - `src/components/profile/`: ProfileForm và các Editor từng mục (ReviewBadge, GeneralInfo, Portrait, Stats, Sections)
    - `src/tokens.css`: Biến CSS sinh tự động từ `system/infra/tokens.py`
 

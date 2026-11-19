@@ -1,7 +1,13 @@
-# Dockerfile cho nền tảng chạy MỘT container từ thư mục gốc repo (snapdeploy, Render, Railway…).
-# - Build context = thư mục gốc repo, mã nguồn lấy từ system/ và web/.
-# - Không có nginx/đăng nhập: app mở công khai -> CHỈ dùng để xem thử với CV GIẢ.
-# - Chạy thật (VPS/máy nội bộ) dùng docker-compose.yml (có nginx + đăng nhập basic auth).
+# Dockerfile duy nhất của dự án FillCV Light Human.
+# - Build context = thư mục gốc repo (.)
+# - Multi-stage build:
+#     Stage 1: Build React web app bằng Node.js 22 -> xuất ra /web/dist
+#     Stage 2: Cài thư viện Python 3.13 + Playwright Chromium
+#     Stage 3: Runtime image an toàn chạy bằng non-root user (appuser 1000)
+# - Phục vụ:
+#     1) Docker Compose nội bộ / VPS (qua Nginx reverse proxy tại cổng 80)
+#     2) Triển khai PaaS 1 container (Render, Railway, Fly.io... đọc biến $PORT)
+#     3) CI/CD GitHub Actions build và kiểm thử tự động
 
 # ---- Stage 1: Build React web app ----
 FROM node:22-alpine AS web-builder
@@ -55,9 +61,8 @@ RUN mkdir -p data/output data/logs \
 USER appuser
 
 ENV CHROMIUM_NO_SANDBOX=1
-# Gói nhỏ (512 MB RAM): mỗi lúc chỉ 1 Chromium dựng PDF, 1 lượt đọc CV. Nền tảng có thể ghi đè.
-ENV RENDER_MAX_CONCURRENT=1
-ENV EXTRACT_MAX_CONCURRENT=1
+ENV RENDER_MAX_CONCURRENT=2
+ENV EXTRACT_MAX_CONCURRENT=2
 ENV HOST=0.0.0.0
 ENV PORT=8000
 

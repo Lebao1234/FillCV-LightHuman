@@ -251,7 +251,6 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: system/Dockerfile
           load: true
           push: false
           tags: cv-app:ci
@@ -297,7 +296,6 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: system/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

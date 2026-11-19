@@ -18,10 +18,10 @@ Người dùng giao tiếp bằng tiếng Việt. Định danh viết tiếng An
 ## Bố cục repo
 
 - Thư mục gốc: `README.md`, `CLAUDE.md`, `docs/`, `.github/` (CI + dependabot), `data/` (không bao giờ commit), và phần triển khai:
+  - `Dockerfile` + `.dockerignore` ở gốc — **Dockerfile duy nhất của toàn bộ dự án** (build context = gốc repo), multi-stage build: stage 1 dùng Node 22 build `web/` ra `web/dist`, stage 2 cài Python 3.13 + Chromium, stage 3 runtime non-root `appuser`. Dùng chung cho Docker Compose, CI/CD và PaaS.
   - `web/` — frontend React + Vite + Tailwind CSS + Vitest. Build ra `web/dist`. Toàn bộ giao tiếp mạng đi qua MỘT module `web/src/api/client.js`; không rải `fetch()` trong component.
-  - `system/` — backend Starlette API (`api/`) và toàn bộ lõi xử lý (`core/`, `services/`, `infra/`, `config/`, `tests/`), `Dockerfile`, `requirements*.txt`.
-  - `docker-compose.yml` — build multi-stage từ gốc repo, mount `data/` ở gốc; app chỉ `expose` 8000, service `nginx` mở cổng 80 (`nginx/conf.d/fillcv.conf`: tắt buffering cho SSE `/api/cv/extract`, `client_max_body_size` ↔ `MAX_UPLOAD_MB`).
-  - `Dockerfile` + `.dockerignore` ở gốc — bản container cho PaaS (Render, Railway…): multi-stage build Node cho `web/` rồi chạy Starlette API serve file tĩnh từ `web/dist`, đọc biến `PORT`, `RENDER_MAX_CONCURRENT=1`, **không có đăng nhập**.
+  - `system/` — backend Starlette API (`api/`) và toàn bộ lõi xử lý (`core/`, `services/`, `infra/`, `config/`, `tests/`), `requirements*.txt`.
+  - `docker-compose.yml` — build từ gốc repo (`build: .`), mount `data/` ở gốc; app chỉ `expose` 8000, service `nginx` mở cổng 80 (`nginx/conf.d/fillcv.conf`: tắt buffering cho SSE `/api/cv/extract`, `client_max_body_size` ↔ `MAX_UPLOAD_MB`).
 - `system/` — thư mục làm việc cho mọi lệnh Python và job CI backend. Đường dẫn bên dưới (`infra/…`, `services/…`, `config/…`, `api/…`) tính từ `system/`; `docs/…` và `web/…` tính từ gốc repo.
 
 ## Lệnh
