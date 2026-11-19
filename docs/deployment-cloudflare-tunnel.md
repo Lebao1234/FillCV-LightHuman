@@ -17,15 +17,19 @@
 ```powershell
 cd E:\FillCV-LightHuman
 
-# Cài thư viện (chạy 1 lần)
+# Cài thư viện Python (chạy 1 lần)
 python -m pip install -r requirements.txt
 python -m playwright install chromium
 
-# Chạy thử
-python -m streamlit run app.py
+# Build giao diện web (chạy 1 lần hoặc khi cập nhật web)
+npm --prefix web install
+npm --prefix web run build
+
+# Chạy thử backend + serve web
+python -m api.server
 ```
 
-Mở `http://localhost:8501` — nếu thấy giao diện là OK. Tắt app (Ctrl+C).
+Mở `http://localhost:8000` — nếu thấy giao diện là OK. Tắt app (Ctrl+C).
 
 ---
 
@@ -58,10 +62,10 @@ cloudflared --version
 5. Cấu hình **Public Hostname**:
    - **Subdomain**: `cv` (hoặc tên bạn muốn)
    - **Domain**: chọn domain của bạn (vd `lighthuman.vn`)
-   - **Service**: `http://localhost:8501`
+   - **Service**: `http://localhost:8000`
 6. Bấm **Save tunnel**
 
-Kết quả: domain `cv.lighthuman.vn` sẽ trỏ về `localhost:8501` trên máy bạn.
+Kết quả: domain `cv.lighthuman.vn` sẽ trỏ về `localhost:8000` trên máy bạn.
 
 ---
 
@@ -112,7 +116,7 @@ Trạng thái `Running` là OK. Từ giờ tunnel tự chạy khi máy khởi đ
    - **Microsoft**: đăng nhập bằng Microsoft 365
 6. Bấm **Save**
 
-Kết quả: truy cập `cv.lighthuman.vn` → Cloudflare yêu cầu đăng nhập → chỉ email `@lighthuman.vn` mới vào được → app Streamlit hiển thị.
+Kết quả: truy cập `cv.lighthuman.vn` → Cloudflare yêu cầu đăng nhập → chỉ email `@lighthuman.vn` mới vào được → giao diện FillCV hiển thị.
 
 ---
 
@@ -124,7 +128,7 @@ Tạo script khởi động:
 # Tạo file start-app.ps1 trong thư mục dự án
 @"
 Set-Location E:\FillCV-LightHuman
-python -m streamlit run app.py --server.address=localhost --server.port=8501
+python -m api.server
 "@ | Out-File -FilePath "E:\FillCV-LightHuman\start-app.ps1" -Encoding utf8
 ```
 
@@ -150,7 +154,7 @@ Register-ScheduledTask `
     -Action $action `
     -Trigger $trigger `
     -Settings $settings `
-    -Description "Hồ sơ ứng viên Light Human - Streamlit app" `
+    -Description "Hồ sơ ứng viên Light Human - API & Web app" `
     -RunLevel Highest
 ```
 
@@ -162,7 +166,7 @@ Từ giờ: **mở máy → tunnel tự chạy → app tự chạy → nhân vi�
 
 | Kiểm tra | Cách | Kết quả đúng |
 |---|---|---|
-| App chạy trên máy | Mở `http://localhost:8501` | Thấy giao diện |
+| App chạy trên máy | Mở `http://localhost:8000` | Thấy giao diện |
 | Tunnel hoạt động | Mở `https://cv.lighthuman.vn` | Thấy trang đăng nhập Cloudflare Access |
 | Access chặn người lạ | Mở bằng email cá nhân (gmail) | Bị từ chối |
 | Access cho nhân viên | Đăng nhập bằng email `@lighthuman.vn` | Thấy giao diện app |
@@ -175,8 +179,8 @@ Từ giờ: **mở máy → tunnel tự chạy → app tự chạy → nhân vi�
 
 | Lỗi | Nguyên nhân | Cách xử lý |
 |---|---|---|
-| `502 Bad Gateway` trên domain | App chưa chạy hoặc đang khởi động | Chờ 30s; kiểm tra `localhost:8501` |
-| Tunnel `ERR_CONNECTION_REFUSED` | Port sai hoặc app bind sai address | Đảm bảo app chạy trên `localhost:8501` |
+| `502 Bad Gateway` trên domain | App chưa chạy hoặc đang khởi động | Chờ 30s; kiểm tra `localhost:8000` |
+| Tunnel `ERR_CONNECTION_REFUSED` | Port sai hoặc app bind sai address | Đảm bảo app chạy trên `localhost:8000` |
 | Đăng nhập xong vẫn bị chặn | Email không thuộc domain cho phép | Kiểm tra policy trong Access |
 | App chạy chậm qua tunnel | Băng thông upload máy thấp | Bình thường — PDF chỉ ~200-500KB |
 | `cloudflared` service không chạy | Token hết hạn hoặc sai | Gỡ service, cài lại với token mới |
@@ -214,7 +218,7 @@ cloudflared tunnel run --token <TOKEN> --loglevel debug
 | Việc | Khi nào cần | Công sức |
 |---|---|---|
 | Chuyển sang VPS + Docker | Máy nội bộ không ổn định, hay mất điện/mạng | 1-2 ngày |
-| Thêm `st.login` trong app | Cần biết **ai** làm hồ sơ nào (audit log) | 0.5-1 ngày |
+| Thêm xác thực trong app | Cần biết **ai** làm hồ sơ nào (audit log) | 0.5-1 ngày |
 | CI tự chạy test | Repo lên GitHub, nhiều người sửa code | 2 giờ |
 | Monitoring (uptime check) | Cần biết app có đang chạy không mà không kiểm tra thủ công | 1 giờ |
 
