@@ -90,6 +90,36 @@ jobs:
         continue-on-error: true
 
   # ------------------------------------------------------------------
+  # 2b. Frontend: lint, test, build web
+  # ------------------------------------------------------------------
+  web:
+    name: Frontend (lint, test, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Test (Vitest)
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+  # ------------------------------------------------------------------
   # 3. Test nhanh (không cần Chromium) + coverage
   #    pytest trả mã lỗi 5 khi "no tests ran" => job sẽ đỏ, không im lặng như trước.
   # ------------------------------------------------------------------
@@ -203,7 +233,7 @@ jobs:
   # ------------------------------------------------------------------
   docker:
     name: Build và đẩy ảnh Docker
-    needs: [hygiene, lint, test, render]
+    needs: [hygiene, lint, test, render, web]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -220,23 +250,24 @@ jobs:
       - name: Build ảnh để kiểm tra
         uses: docker/build-push-action@v6
         with:
-          context: ./system
+          context: .
+          file: system/Dockerfile
           load: true
           push: false
           tags: cv-app:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # ENTRYPOINT của Dockerfile đã đặt --server.address=0.0.0.0 để container nhận kết nối;
+      # ENTRYPOINT của Dockerfile đã đặt --host=0.0.0.0 --port=8000 để container nhận kết nối;
       # cổng chỉ được mở cho 127.0.0.1 của runner.
       - name: Smoke test (health check)
         run: |
           docker run -d --name cv-app \
-            -p 127.0.0.1:8501:8501 \
+            -p 127.0.0.1:8000:8000 \
             cv-app:ci
           ok=0
           for i in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:8501/_stcore/health; then ok=1; break; fi
+            if curl -fsS http://127.0.0.1:8000/health; then ok=1; break; fi
             sleep 2
           done
           docker logs cv-app
@@ -256,7 +287,7 @@ jobs:
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         uses: docker/metadata-action@v5
         with:
-          images:
+          images: ${{ env.IMAGE }}
           tags: |
             type=sha,format=short
             type=raw,value=latest
@@ -265,7 +296,8 @@ jobs:
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         uses: docker/build-push-action@v6
         with:
-          context: ./system
+          context: .
+          file: system/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
