@@ -29,3 +29,4 @@ export default function ReviewBadge({ review, paths = [] }) {
     </span>
   )
 }
+

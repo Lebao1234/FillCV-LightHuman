@@ -1,6 +1,8 @@
 # Thư viện chạy app — ghim đúng phiên bản đã kiểm thử (D1). Nâng cấp: đổi số ở đây, cài lại, chạy pytest.
 # Test/đo độ phủ: xem requirements-dev.txt
-streamlit==1.67.0
+starlette==1.10.0
+uvicorn==0.54.0
+python-multipart==0.0.22
 pydantic==2.14.1
 jinja2==3.1.6
 markupsafe==3.0.3            # render.py dùng trực tiếp (Markup, escape)

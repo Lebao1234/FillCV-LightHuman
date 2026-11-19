@@ -130,3 +130,4 @@ export default function GeneralInfoEditor({ cv, onChange, review }) {
     </div>
   )
 }
+

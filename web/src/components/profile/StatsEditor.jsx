@@ -101,3 +101,4 @@ export default function StatsEditor({ cv, onChange, review }) {
     </div>
   )
 }
+

@@ -50,12 +50,16 @@ api_routes = [
 ]
 
 # Kiểm tra thư mục web/dist để serve file tĩnh khi production
-web_dist = Path(__file__).resolve().parent.parent.parent / "web" / "dist"
-if not web_dist.exists():
-    web_dist = Path("web/dist")
+possible_dirs = [
+    Path(__file__).resolve().parent.parent.parent / "web" / "dist",
+    Path("web/dist"),
+    Path("/web/dist"),
+    Path("/app/web/dist"),
+]
+web_dist = next((p for p in possible_dirs if p.exists() and p.is_dir()), None)
 
 all_routes = list(api_routes)
-if web_dist.exists() and web_dist.is_dir():
+if web_dist:
     all_routes.append(Mount("/", app=StaticFiles(directory=str(web_dist), html=True), name="static"))
 
 # Middleware CORS cho môi trường dev

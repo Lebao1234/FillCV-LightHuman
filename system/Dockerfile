@@ -1,7 +1,14 @@
-# ---- Build stage: cài thư viện + Chromium ----
-FROM python:3.13-slim AS builder
+# ---- Build stage 1: Build React web app ----
+FROM node:22-alpine AS web-builder
+WORKDIR /web
+COPY web/package*.json ./
+RUN npm ci
+COPY web/ ./
+RUN npm run build
 
-# Thư viện hệ thống cần cho opencv-python-headless, PyMuPDF, Pillow
+# ---- Build stage 2: cài thư viện Python + Chromium ----
+FROM python:3.13-slim AS python-builder
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libgl1 libglib2.0-0 libnss3 libatk1.0-0 libatk-bridge2.0-0 \
         libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 \
@@ -11,54 +18,44 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-COPY requirements.txt .
+COPY system/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt \
     && python -m playwright install --with-deps --only-shell chromium
 
 # ---- Runtime stage ----
 FROM python:3.13-slim
 
-# Tạo user không phải root (bảo mật)
 RUN groupadd --gid 1000 appuser && useradd --uid 1000 --gid appuser --shell /bin/bash appuser
 
 WORKDIR /app
 
-# Copy Python packages + Playwright browsers từ builder
-COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
+COPY --from=python-builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
+COPY --from=python-builder /usr/local/bin /usr/local/bin
 
-# Thư viện hệ thống: Chromium (playwright install-deps cài đúng bộ cho bản đã ghim — liệt kê tay từng thiếu
-# libXfixes) + opencv (libgl1, libglib2.0-0) + font Times New Roman thay thế (metric-compatible)
 RUN apt-get update \
     && python -m playwright install-deps chromium \
     && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
-COPY --from=builder --chown=appuser:appuser /root/.cache/ms-playwright /home/appuser/.cache/ms-playwright
+COPY --from=python-builder --chown=appuser:appuser /root/.cache/ms-playwright /home/appuser/.cache/ms-playwright
 
-# Copy mã nguồn
-COPY . .
+# Copy mã nguồn backend
+COPY system/ .
+# Copy bản build web
+COPY --from=web-builder /web/dist /web/dist
 
-# Tạo thư mục data (output + logs) thuộc appuser. Chỉ gán quyền chỗ cần ghi
-# (chown -R cả /home/appuser sẽ nhân đôi Chromium trong image)
 RUN mkdir -p data/output data/logs \
     && chown -R appuser:appuser /app/data \
     && chown appuser:appuser /home/appuser
 
 USER appuser
 
-# Chromium trong Docker cần --no-sandbox (user không phải root)
 ENV CHROMIUM_NO_SANDBOX=1
-# Streamlit không mở trình duyệt tự động
-ENV STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
-ENV STREAMLIT_SERVER_HEADLESS=true
+ENV HOST=0.0.0.0
+ENV PORT=8000
 
-EXPOSE 8501
+EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')" || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
 
-ENTRYPOINT ["python", "-m", "streamlit", "run", "app.py", \
-            "--server.address=0.0.0.0", \
-            "--server.port=8501", \
-            "--server.maxUploadSize=20"]
-
+CMD ["sh", "-c", "exec uvicorn api.server:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]
