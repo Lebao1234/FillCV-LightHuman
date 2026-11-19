@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { SUPPORTED_LANGUAGES } from '../i18n/config.jsx'
 
 const ICON_FILE = (
   <svg
@@ -77,6 +78,8 @@ export default function ExtractionPanel({
   originalName = '',
   project = '',
   position = '',
+  pdfLang = 'vi',
+  elapsedSeconds = null,
   summary = '',
   review = null,
   error = null,
@@ -88,6 +91,7 @@ export default function ExtractionPanel({
   const [file, setFile] = useState(null)
   const [inputProject, setInputProject] = useState(project || '')
   const [inputPosition, setInputPosition] = useState(position || '')
+  const [inputLang, setInputLang] = useState(pdfLang || 'vi')
   const [copied, setCopied] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef(null)
@@ -103,6 +107,7 @@ export default function ExtractionPanel({
       file,
       project: inputProject,
       position: inputPosition,
+      lang: inputLang,
     })
     setFile(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
@@ -238,6 +243,24 @@ export default function ExtractionPanel({
               </div>
             </div>
 
+            <div className="form-group" style={{ marginBottom: 'var(--sp-4)' }}>
+              <label className="form-label">Ngôn ngữ xuất hồ sơ</label>
+              <div className="lang-options">
+                {SUPPORTED_LANGUAGES.map((l) => (
+                  <label key={l.code}>
+                    <input
+                      type="radio"
+                      name="targetLang"
+                      value={l.code}
+                      checked={inputLang === l.code}
+                      onChange={() => setInputLang(l.code)}
+                    />
+                    {l.flag} {l.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
             <button
               type="submit"
               className="btn btn-primary btn-block"
@@ -254,7 +277,8 @@ export default function ExtractionPanel({
               <div className="sf-info">
                 <div className="sf-name">{originalName || file?.name || 'File CV'}</div>
                 <div className="sf-meta">
-                  Dự án: <strong>{project || '—'}</strong> · Vị trí: <strong>{position || 'Theo CV'}</strong>
+                  Dự án: <strong>{project || '—'}</strong> · Vị trí: <strong>{position || 'Theo CV'}</strong> · Ngôn ngữ:{' '}
+                  <strong>{pdfLang === 'en' ? 'English' : 'Tiếng Việt'}</strong>
                 </div>
               </div>
             </div>
@@ -288,7 +312,9 @@ export default function ExtractionPanel({
             <div className="ph-title">Tiến trình các bước bóc tách</div>
             <div className="ph-badge">
               {hasData
-                ? 'Hoàn tất 100%'
+                ? elapsedSeconds
+                  ? `Hoàn tất trong ${elapsedSeconds}s (100%)`
+                  : 'Hoàn tất 100%'
                 : isBusy
                 ? `Đang chạy bước ${Math.min(activeStep + 1, steps.length)}/${steps.length}`
                 : 'Chưa khởi chạy'}
@@ -346,6 +372,16 @@ export default function ExtractionPanel({
                   {cvData.birth_year && <span>Năm sinh: <strong>{cvData.birth_year}</strong></span>}
                   {cvData.gender && <span>Giới tính: <strong>{cvData.gender}</strong></span>}
                   <span>Ảnh chân dung: <strong>{cvData.has_photo ? 'Đã lấy từ CV gốc' : 'Không có trong CV'}</strong></span>
+                  <span>
+                    Ngôn ngữ CV gốc:{' '}
+                    <strong>
+                      {cvData.language === 'en'
+                        ? 'Tiếng Anh'
+                        : cvData.language === 'bilingual_vi_en'
+                        ? 'Song ngữ'
+                        : 'Tiếng Việt'}
+                    </strong>
+                  </span>
                 </div>
               </div>
             </div>
@@ -454,3 +490,4 @@ export default function ExtractionPanel({
     </div>
   )
 }
+

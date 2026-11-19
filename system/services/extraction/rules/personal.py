@@ -20,6 +20,7 @@ ADDRESS = re.compile(
     r"(?:\b(?:số|so)\s*\d+|\d+[a-z]?/\d+|\bkp\s*\d+|\bp\.\s*\d|\bq\.\s*\d|\b(?:phường|phuong|quận|quan|huyện|huyen|"
     r"xã|thị trấn|thị xã|đường|duong|ngõ|ngách|hẻm|kiệt|tổ dân phố|khu phố|ấp|thôn|tỉnh|tp\.?|thành phố|"
     r"ward|district|street|st\.|road|province|city)\b)", re.IGNORECASE)
+_BIRTH_YEAR = re.compile(r"(19[4-9]\d|20[01]\d)")          # năm sinh hợp lệ (khớp VALID_BIRTH_YEAR_* của schema)
 GENDER_WORDS = {"nam": "Nam", "nu": "Nữ", "male": "Male", "female": "Female"}
 _KIND_OF_CHECK = {"Số điện thoại": "phone", "Email": "email", "Đường link": "link", "Mạng xã hội": "social",
                   "Ngày sinh đầy đủ": "birth"}
@@ -119,7 +120,8 @@ def find_original_stats(pre: list[Line], ident: Identity) -> None:
 def _segments(line: Line) -> list[Line]:
     """'Năm sinh: 1987 <tab> Giới tính: Nữ' -> 2 dòng ảo; dòng không có nhãn nào thì giữ nguyên."""
     parts = [p.strip() for p in re.split(r"\t+|\s+\|\s+|\s*[✦◆♦]\s*", line.text) if p.strip()]
-    if len(parts) < 2 or not any(content.label_of(p) or label_kind(p.rstrip(":")) for p in parts):
+    # tách khi có ô mang nhãn, hoặc có ô là thông tin liên hệ không nhãn (ô cạnh icon: "27/04/2001 <tab> fb ...")
+    if len(parts) < 2 or not any(content.label_of(p) or label_kind(p.rstrip(":")) or _found(p) for p in parts):
         return [line]
     return [replace(line, text=p, spans=[Span(p, line.bold, line.italic)]) for p in parts]
 
@@ -137,7 +139,7 @@ def _apply_label(label: str, value: str, kind: str, ident: Identity, wish: list[
     if kind == "remove":
         ident.removed.add(r["_removed_index"].get(rulebook.norm(label), "address"))
     elif kind == "birth":
-        y = re.search(r"(19[4-9]\d|20[01]\d)", value)
+        y = _BIRTH_YEAR.search(value)
         if y:
             ident.birth_year = int(y.group(1))
         if re.search(r"\d{1,2}\s*[/.\-]\s*\d{1,2}", value) or not y:
@@ -199,7 +201,11 @@ def strip_personal(lines: list[Line], personal_ids: set[int], ident: Identity,
             found = _found(text)
             if found and len(re.sub(r"[\W\d_]", "", _scrub(text, set()))) < 3:
                 ident.removed.update(_KIND_OF_CHECK.get(k, "phone") for k, _ in found)
-                continue                                          # dòng chỉ có SĐT/email/link
+                # ngày sinh đứng riêng cạnh icon (không nhãn) ở khối đầu CV: vẫn giữ lại năm sinh như ngày sinh có nhãn
+                y = _BIRTH_YEAR.search(text)
+                if y and ident.birth_year is None and any(_KIND_OF_CHECK.get(k) == "birth" for k, _ in found):
+                    ident.birth_year = int(y.group(1))
+                continue                                          # dòng chỉ có SĐT/email/link/ngày sinh
             if ADDRESS.search(text) and (re.search(r"\d", text) or "," in text):
                 ident.removed.add("address")
                 continue

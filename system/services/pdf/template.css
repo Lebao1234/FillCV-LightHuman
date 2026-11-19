@@ -67,6 +67,11 @@ body {
   letter-spacing: .1em;
 }
 
+/* Tiêu đề hồ sơ luôn 1 dòng ("CANDIDATE PROFILE" bản tiếng Anh dài hơn "HỒ SƠ ỨNG VIÊN"); tên dự án vẫn xuống dòng */
+.brand .doc > b {
+  white-space: nowrap;
+}
+
 .brand .doc .proj {
   display: block;
   margin-top: 1mm;

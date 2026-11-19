@@ -2,7 +2,7 @@
 # Mọi từ khoá viết KHÔNG DẤU, chữ thường (bộ đọc bỏ dấu + hạ chữ trước khi so khớp). Không ghi dữ liệu ứng viên.
 # Đổi file này -> phiên bản bộ đọc (metadata PDF) đổi theo mã băm.
 
-version = "1"
+version = "2"   # 2: nhận 2 cột dưới khối đầu trang, nhãn cỡ thân bài không thành mục, tiêu đề 2 dòng, ngày sinh không nhãn
 
 # ---------------------------------------------------------------------------
 # Tiêu đề mục: [headings.<khoá>] type = loại mục theo schema; vi/en = các cách viết

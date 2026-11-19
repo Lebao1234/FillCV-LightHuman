@@ -74,6 +74,11 @@ def logical_items(lines: list[Line]) -> list[Item]:
             fresh = label_of(l.text) is not None or _has_range(l.text) or prev.text.rstrip().endswith(":")
             cont = (full and close and not fresh and "\t" not in prev.text and prev.bold == l.bold
                     if l.bold or prev.bold else full and close and not fresh and "\t" not in prev.text)
+            # chữ ngắn căn giữa bị ngắt dòng (chú thích dưới icon): dòng sau viết thường và dòng trước kết thúc bằng
+            # dấu phẩy, hoặc hai dòng cùng tâm nhưng lệch lề trái — danh sách căn trái thì không bao giờ khớp
+            if not cont and close and not fresh and l.text[:1].islower() and "\t" not in prev.text:
+                centered = abs((l.x0 + l.x1) - (prev.x0 + prev.x1)) <= 4 and abs(l.x0 - prev.x0) > 2
+                cont = prev.text.rstrip().endswith(",") or centered
         if cont:
             it = items[-1]
             it.text = f"{it.text} {marked_text(l)}".strip()

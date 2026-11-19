@@ -13,9 +13,26 @@ describe('ExtractionPanel Component', () => {
       screen.getByText(/Kéo thả file CV vào đây hoặc bấm để chọn/i)
     ).toBeInTheDocument()
     expect(screen.getByPlaceholderText(/Message Coffee/i)).toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: /Bắt đầu bóc tách CV/i })
-    ).toBeInTheDocument()
+    expect(screen.getByText(/Ngôn ngữ xuất hồ sơ/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Bắt đầu bóc tách CV/i })).toBeInTheDocument()
+  })
+
+  // Kiểm tra hiển thị thời gian bóc tách và ngôn ngữ trong thẻ nguồn file
+  it('hiển thị thời gian bóc tách thành công và ngôn ngữ hồ sơ đã chọn', () => {
+    const mockCv = { full_name: 'Trần Văn B' }
+    render(
+      <ExtractionPanel
+        cvData={mockCv}
+        originalName="sample.pdf"
+        project="Test Prj"
+        position="Developer"
+        pdfLang="en"
+        elapsedSeconds={1.25}
+      />
+    )
+
+    expect(screen.getByText(/Hoàn tất trong 1.25s/i)).toBeInTheDocument()
+    expect(screen.getByText(/English/i)).toBeInTheDocument()
   })
 
   // Kiểm tra hiển thị banner hàng đợi khi đang xếp hàng

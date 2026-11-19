@@ -5,11 +5,17 @@ Không OCR: PDF không có lớp chữ (bản scan) hoặc chữ lỗi mã hoá 
 import re
 from dataclasses import dataclass, field
 
+from services.extraction.rules import rulebook
+
 BULLET_CHARS = "•●▪■◦○◆◇►▶➢➤➣✓✔✗✦★☐❖·‣⁃−–—-+*"
 _PUA = re.compile(r"[-]")                       # ký hiệu font Symbol/Wingdings của Word (vd )
 _BULLET = re.compile(rf"^\s*(?:[{re.escape(BULLET_CHARS)}]|[-]|o(?=\s))\s*")
 _NUMBERED = re.compile(r"^\s*(?:\d{1,2}|[a-z])[.)]\s+(?=\S)")
 _PAGE_NO = re.compile(r"^\s*(?:trang|page)?\s*\d{1,2}\s*(?:/|of|trên)\s*\d{1,2}\s*$", re.IGNORECASE)
+_WATERMARK = re.compile(r"^\s*©")                 # dòng bản quyền của trang tạo CV ("© <tên trang>") — không phải nội dung
+MIN_COLUMN_REGION = 0.4        # vùng 2 cột phía dưới khối đầu trang phải chứa ít nhất tỉ lệ này số chữ của trang
+HEADING_MAX_WORDS = 8          # dòng dài hơn thì không xét là tiêu đề mục khi kiểm tra 2 cột
+REGION_MAX_CROSSING = 1        # ... và gần như không dòng nào cắt ngang khe (lưới thẻ 2 cột giữa CV 1 cột thì có)
 MIN_CHARS = 80                 # ít hơn số ký tự này trên cả file -> coi như không có lớp chữ
 MAX_BAD_RATIO = 0.08           # tỉ lệ ký tự lỗi (�, ký tự điều khiển) vượt mức này -> chữ lỗi mã hoá
 
@@ -125,7 +131,8 @@ def _merge_same_row(lines: list[Line]) -> list[Line]:
 
 
 # Tìm khe dọc chia trang thành 2 cột (CV có sidebar); không có -> None
-def _find_gutter(lines: list[Line], width: float) -> float | None:
+def _find_gutter(lines: list[Line], width: float, max_crossing: int | None = None) -> float | None:
+    """`max_crossing`: số dòng tối đa được cắt ngang khe (mặc định 8% số dòng — đủ cho cả trang)."""
     total = sum(len(l.text) for l in lines)
     if total < 200 or len(lines) < 12:
         return None
@@ -134,7 +141,8 @@ def _find_gutter(lines: list[Line], width: float) -> float | None:
         crossing = [l for l in lines if l.x0 < x - 2 and l.x1 > x + 2]
         left = sum(len(l.text) for l in lines if l.x1 <= x + 2)
         right = sum(len(l.text) for l in lines if l.x0 >= x - 2)
-        if len(crossing) > max(2, len(lines) * 0.08) or min(left, right) < total * 0.15:
+        limit = max(2, len(lines) * 0.08) if max_crossing is None else max_crossing
+        if len(crossing) > limit or min(left, right) < total * 0.15:
             continue
         score = min(left, right) - 50 * len(crossing)
         if best is None or score > best[0]:
@@ -142,10 +150,43 @@ def _find_gutter(lines: list[Line], width: float) -> float | None:
     return float(best[1]) if best else None
 
 
-# Gán cột cho từng dòng theo khe dọc (không có khe -> mọi dòng là -1)
-def _assign_cols(lines: list[Line], gutter: float | None) -> None:
-    for l in lines:
-        l.col = -1 if gutter is None else (0 if l.x1 <= gutter + 2 else (1 if l.x0 >= gutter - 2 else -1))
+# Tìm khe 2 cột cho cả trang, hoặc cho phần dưới một khối đầu trang trải ngang; trả (khe, y bắt đầu vùng 2 cột)
+def _find_columns(lines: list[Line], width: float) -> tuple[float | None, float]:
+    """Nhiều mẫu CV có khối đầu trang toàn chiều ngang (tên, liên hệ, đoạn giới thiệu) rồi mới chia 2 cột:
+    khối đó cắt ngang mọi khe nên tìm khe trên cả trang thất bại. Khi đó thử lần lượt từ trên xuống, lấy vùng
+    LỚN NHẤT (bắt đầu sớm nhất) có khe và chiếm ít nhất MIN_COLUMN_REGION số chữ của trang.
+    Vùng chỉ được nhận là 2 cột khi MỖI cột có ít nhất một tiêu đề mục (khớp bảng từ khoá) — sidebar thật luôn có;
+    lưới thẻ 2 cột, bảng nhiều cột hay cột ngày tháng căn phải trong CV 1 cột thì không."""
+    gutter = _find_gutter(lines, width)
+    if gutter is not None or not lines:
+        return gutter, float("-inf")
+    total = sum(len(ln.text) for ln in lines)
+    for y in sorted({round(ln.y0) for ln in lines}):
+        region = [ln for ln in lines if ln.y0 >= y - 1]
+        if sum(len(ln.text) for ln in region) < total * MIN_COLUMN_REGION:
+            break
+        gutter = _find_gutter(region, width, REGION_MAX_CROSSING)   # vùng nhỏ: 2 cột thật không có đoạn trải ngang
+        if gutter is not None and _both_columns_have_heading(region, gutter):
+            return gutter, y - 1
+    return None, float("-inf")
+
+
+# Mỗi bên khe có ít nhất một dòng là tiêu đề mục (khớp bảng từ khoá)
+def _both_columns_have_heading(lines: list[Line], gutter: float) -> bool:
+    sides = set()
+    for ln in lines:
+        if len(ln.text.split()) <= HEADING_MAX_WORDS and rulebook.match_heading(ln.text):
+            sides.add(0 if ln.x1 <= gutter + 2 else (1 if ln.x0 >= gutter - 2 else -1))
+    return {0, 1} <= sides
+
+
+# Gán cột cho từng dòng theo khe dọc (không có khe -> mọi dòng là -1; dòng phía trên vùng 2 cột cũng là -1)
+def _assign_cols(lines: list[Line], gutter: float | None, top: float = float("-inf")) -> None:
+    for ln in lines:
+        if gutter is None or ln.y0 < top:
+            ln.col = -1
+        else:
+            ln.col = 0 if ln.x1 <= gutter + 2 else (1 if ln.x0 >= gutter - 2 else -1)
 
 
 # Sắp thứ tự đọc: dòng toàn chiều ngang chia trang thành các đoạn; trong đoạn đọc hết cột trái rồi cột phải
@@ -201,9 +242,10 @@ def read_lines(pdf_bytes: bytes, max_pages: int | None = None) -> tuple[list[Lin
                                     "tự động — hãy nhập tay, đối chiếu tab CV gốc.")
         for i, page in enumerate(doc):
             raw = _raw_lines(page, i)
-            gutter = _find_gutter(raw, page.rect.width)
+            raw = [l for l in raw if not _WATERMARK.match(l.text)]
+            gutter, top = _find_columns(raw, page.rect.width)
             info["two_columns"] |= gutter is not None
-            _assign_cols(raw, gutter)
+            _assign_cols(raw, gutter, top)
             for l in _reading_order(_merge_same_row(raw)):
                 l._edge = l.y0 < page.rect.height * 0.08 or l.y1 > page.rect.height * 0.92
                 if not _PAGE_NO.match(l.text):

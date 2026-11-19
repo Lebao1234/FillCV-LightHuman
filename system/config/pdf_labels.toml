@@ -1,0 +1,64 @@
+# Chữ trên PDF theo NGÔN NGỮ XUẤT (nút "Tiếng Việt / English" ở tab Bản PDF). Dùng ở services/pdf/labels.py.
+# Dịch hoàn toàn trên máy chủ bằng bảng dưới đây — KHÔNG gọi dịch vụ dịch bên ngoài (dữ liệu CV không rời máy chủ).
+# Chỉ đổi những gì đang ở ngôn ngữ KIA: xuất tiếng Việt từ CV tiếng Việt thì PDF giữ nguyên như trước.
+# Nội dung tự do (mô tả công việc, tên công ty…) KHÔNG dịch — nhân viên tự sửa trong tab "Chỉnh sửa nội dung".
+# Chữ của công ty (footer, ghi chú người tham chiếu) nằm trong config/company.toml ([pdf] và [pdf_en]).
+
+# Chữ cố định của mẫu PDF
+[text.vi]
+doc_title = "Hồ sơ ứng viên"        # header — mục 3.1 SKILL.md
+project = "Dự án"
+address = "Địa chỉ"
+phone = "Điện thoại"
+email = "Email"
+website = "Website"
+birth_year = "Năm sinh"
+gender = "Giới tính"
+page = "Trang"                      # footer: "Trang 1/2"
+file_suffix = ""                    # hậu tố tên file (mục 3.6 SKILL.md)
+
+[text.en]
+doc_title = "Candidate Profile"
+project = "Project"
+address = "Address"
+phone = "Phone"
+email = "Email"
+website = "Website"
+birth_year = "Year of birth"
+gender = "Gender"
+page = "Page"
+file_suffix = " - EN"
+
+# Tên hiển thị của tiêu đề mục: khoá = khoá [headings.<khoá>] trong config/extraction_rules.toml
+# (tiêu đề trong CV được nhận ra bằng chính bảng từ khoá đó). Mục không có ở đây giữ nguyên tiêu đề.
+[section_titles]
+summary = ["Mục tiêu nghề nghiệp", "Career Objective"]
+highlights = ["Thành tích nổi bật", "Key Achievements"]
+competencies = ["Năng lực cốt lõi", "Core Competencies"]
+skills = ["Kỹ năng", "Skills"]
+tools = ["Công cụ – Phần mềm", "Tools & Software"]
+languages = ["Ngoại ngữ", "Languages"]
+career_path = ["Lộ trình sự nghiệp", "Career Path"]
+experience = ["Kinh nghiệm làm việc", "Work Experience"]
+projects = ["Dự án", "Projects"]
+education = ["Học vấn", "Education"]
+activities = ["Hoạt động", "Activities"]
+interests = ["Sở thích", "Interests"]
+other = ["Thông tin thêm", "Additional Information"]
+references = ["Người tham chiếu", "References"]
+
+# Cặp thuật ngữ [tiếng Việt, tiếng Anh] cho nhãn ngắn: giới tính, nhãn dòng thông tin, ô số liệu, đơn vị thời gian.
+# So khớp NGUYÊN CỤM, GIỮ dấu ("Nam" khác "năm"), không phân biệt hoa thường. Tên bậc học lấy từ [education].degree_levels.
+[terms]
+pairs = [
+  ["Nam", "Male"],
+  ["Nữ", "Female"],
+  ["Mong muốn", "Desired"],
+  ["Kinh nghiệm làm việc", "Years of experience"],
+  ["Kinh nghiệm làm việc", "Months of experience"],
+  ["Kinh nghiệm quản lý", "Management experience"],
+  ["Doanh nghiệp đã làm việc", "Companies"],
+  ["Trình độ học vấn", "Education"],
+  ["năm", "years"],
+  ["tháng", "months"],
+]

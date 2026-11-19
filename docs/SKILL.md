@@ -56,6 +56,7 @@ description: Làm lại CV ứng viên theo chuẩn Light Human để gửi khá
   Ngăn với khối bên phải bằng vạch dọc xám mảnh.
 - **Phải**: "HỒ SƠ ỨNG VIÊN" (in hoa, navy, đậm); dòng dưới "Dự án: **<tên dự án>**" (tên dự án đậm, màu gold).
   - **KHÔNG** có dòng tiếng Anh "Candidate Profile".
+  - **Bản tiếng Anh** (chọn "English" khi xuất): ngược lại — "CANDIDATE PROFILE" + "Project: **<tên dự án>**", không có "Hồ sơ ứng viên". Chữ cố định lấy từ `config/pdf_labels.toml`.
 - Dưới header chỉ **một đường kẻ navy 2pt**. **KHÔNG** có gạch vàng/gold.
 
 ### 3.2. Bảo mật thông tin ứng viên
@@ -96,6 +97,7 @@ LH - CV <Tên vị trí> - <Họ và tên ứng viên> - <ddmmyyyy>.pdf
 ```
 
 - Ví dụ: `LH - CV Ke toan truong - Tran Hong Linh - 05112026.pdf`, `LH - CV BA - Pham Hong Phuc - 06112026.pdf`
+- Bản tiếng Anh thêm hậu tố ` - EN`: `LH - CV Ke toan truong - Tran Hong Linh - 05112026 - EN.pdf`
 - Ngày = ngày xuất file theo **giờ Việt Nam**, trừ khi chị nói khác.
 - Bỏ dấu bằng `unicodedata` và đổi `đ/Đ` → `d/D`.
 - `<title>` của HTML (= tiêu đề PDF) **đúng bằng tên file** (không có `.pdf`).
@@ -265,7 +267,7 @@ page.pdf(
 - [ ] `pdftotext | grep`: không còn SĐT, email, địa chỉ, ngày sinh, link của ứng viên.
       *(028 3842 5188 và info@lighthuman.vn là của Light Human — được phép.)*
 - [ ] Render ảnh từng trang và xem: không tràn chữ, không tiêu đề mồ côi, không trang cuối gần trống.
-- [ ] Header đúng mục 3.1 (không "Candidate Profile", không gạch gold).
+- [ ] Header đúng mục 3.1 (bản tiếng Việt không "Candidate Profile", bản tiếng Anh không "Hồ sơ ứng viên"; không gạch gold).
 - [ ] Đủ các mục của CV gốc, không thêm thông tin bịa.
 - [ ] Tên file và `<title>` đúng mục 3.6; không còn file tên cũ.
 

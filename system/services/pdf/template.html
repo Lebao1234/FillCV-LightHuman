@@ -1,11 +1,12 @@
 {#-
   Hồ sơ ứng viên PDF — bố cục theo mục 3–5 SKILL.md. Dựng bởi render.render_html().
 
-  Biến vào: cv, project, title, logo, photo, compact, css, company_info, ref_note
+  Biến vào: cv, project, title, logo, photo, compact, css, company_info, ref_note, lang, t
   `css` là toàn bộ CSS đã ghép sẵn bằng Python (render.pdf_css: lề, màu, font, cỡ chữ + template.css)
   -> khối style không còn biểu thức Jinja. Ở đây chỉ điều khiển class "compact" và số cột ô số liệu.
+  `lang` = ngôn ngữ xuất ('vi' | 'en'); `t` = chữ cố định theo ngôn ngữ (labels.texts, config/pdf_labels.toml).
 -#}
-{%- set en = cv.language == 'en' -%}
+{%- set en = lang == 'en' -%}
 
 {#- ===================================================================== Macro dùng chung #}
 
@@ -121,14 +122,14 @@
   <div class="right">
     <div class="co">
       {#- A4: thông tin công ty từ config/company.toml (cùng nguồn với bộ lọc PII trong checks.py) #}
-      <span class="lbl">Địa chỉ:</span> {{ company_info.address }}<br>
-      <span class="lbl">Điện thoại:</span> {{ company_info.phone }}<br>
-      <span class="lbl">Email:</span> {{ company_info.email }}<br>
-      <span class="lbl">Website:</span> {{ company_info.website }}
+      <span class="lbl">{{ t.address }}:</span> {{ company_info.address }}<br>
+      <span class="lbl">{{ t.phone }}:</span> {{ company_info.phone }}<br>
+      <span class="lbl">{{ t.email }}:</span> {{ company_info.email }}<br>
+      <span class="lbl">{{ t.website }}:</span> {{ company_info.website }}
     </div>
     <div class="doc">
-      <b>Hồ sơ ứng viên</b>
-      {% if project %}<span class="proj">Dự án: <b>{{ project }}</b></span>{% endif %}
+      <b>{{ t.doc_title }}</b>
+      {% if project %}<span class="proj">{{ t.project }}: <b>{{ project }}</b></span>{% endif %}
     </div>
   </div>
 </div>
@@ -141,10 +142,10 @@
     {% if cv.target_title %}<div class="title">{{ cv.target_title }}</div>{% endif %}
     <div class="facts">
       {%- if cv.birth_year %}
-      <span><b>{{ 'Year of birth' if en else 'Năm sinh' }}:</b> {{ cv.birth_year }}</span>
+      <span><b>{{ t.birth_year }}:</b> {{ cv.birth_year }}</span>
       {%- endif %}
       {%- if cv.gender %}
-      <span><b>{{ 'Gender' if en else 'Giới tính' }}:</b> {{ cv.gender }}</span>
+      <span><b>{{ t.gender }}:</b> {{ cv.gender }}</span>
       {%- endif %}
       {%- for f in cv.facts if f.value %}
       <span>{% if f.label %}<b>{{ f.label }}:</b> {% endif %}{{ f.value }}</span>

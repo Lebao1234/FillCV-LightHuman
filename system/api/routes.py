@@ -12,6 +12,7 @@ import hashlib
 import io
 import json
 import logging
+import time
 from pathlib import Path
 
 from starlette.requests import Request
@@ -68,9 +69,50 @@ async def get_config(request: Request) -> JSONResponse:
     })
 
 
+# Bộ đếm giới hạn tần suất gửi CV (tránh spam / làm nghẽn hàng đợi đọc CV)
+class ExtractRateLimiter:
+    """Giới hạn tần suất trích xuất CV theo địa chỉ IP (mặc định 15 yêu cầu / phút)."""
+
+    def __init__(self, max_requests: int = 15, window_seconds: float = 60.0):
+        self.max_requests = max_requests
+        self.window_seconds = window_seconds
+        self._history: dict[str, list[float]] = {}
+        self._lock = asyncio.Lock()
+
+    async def is_allowed(self, ip: str) -> bool:
+        now = time.monotonic()
+        async with self._lock:
+            timestamps = self._history.get(ip, [])
+            valid_timestamps = [t for t in timestamps if now - t < self.window_seconds]
+            if len(valid_timestamps) >= self.max_requests:
+                self._history[ip] = valid_timestamps
+                return False
+            valid_timestamps.append(now)
+            self._history[ip] = valid_timestamps
+            # Dọn bớt các IP cũ không hoạt động nếu bảng quá lớn
+            if len(self._history) > 1000:
+                self._history = {k: v for k, v in self._history.items() if v and now - v[-1] < self.window_seconds}
+            return True
+
+
+_extract_rate_limiter = ExtractRateLimiter(max_requests=15, window_seconds=60.0)
+
+
 # Trích xuất nội dung CV và stream tiến độ/kết quả qua SSE
 async def extract_cv(request: Request) -> Response:
     """Nhận file CV tải lên, xử lý qua pipeline.read_cv và stream tiến độ qua SSE."""
+    # Kiểm tra giới hạn tần suất theo IP người dùng
+    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+    if "," in client_ip:
+        client_ip = client_ip.split(",")[0].strip()
+
+    if not await _extract_rate_limiter.is_allowed(client_ip):
+        log.warning("Rate limit trích xuất CV vượt ngưỡng đối với IP: %s", client_ip)
+        return JSONResponse(
+            {"error": "Bạn đang gửi CV quá nhanh. Vui lòng chờ ít phút rồi thử lại."},
+            status_code=429,
+        )
+
     content_type = request.headers.get("content-type", "")
     if "multipart/form-data" not in content_type:
         return JSONResponse({"error": "Yêu cầu phải là multipart/form-data."}, status_code=400)
@@ -132,6 +174,7 @@ async def extract_cv(request: Request) -> Response:
         # Chạy trích xuất trong worker thread để không chặn event loop
         def run_extraction():
             logging_setup.set_run_id(run_id)
+            t0 = time.monotonic()
             try:
                 res = pipeline.read_cv(
                     file_bytes,
@@ -141,7 +184,8 @@ async def extract_cv(request: Request) -> Response:
                     on_progress=on_progress,
                     on_wait=on_wait,
                 )
-                loop.call_soon_threadsafe(event_queue.put_nowait, ("result", res))
+                elapsed = round(time.monotonic() - t0, 2)
+                loop.call_soon_threadsafe(event_queue.put_nowait, ("result", (res, elapsed)))
             except Exception as exc:
                 loop.call_soon_threadsafe(event_queue.put_nowait, ("exception", exc))
 
@@ -154,7 +198,7 @@ async def extract_cv(request: Request) -> Response:
             elif item_type == "progress":
                 yield f"event: progress\ndata: {json.dumps(item_data, ensure_ascii=False)}\n\n"
             elif item_type == "result":
-                res = item_data
+                res, elapsed = item_data
                 run.photo = res.photo
                 payload = {
                     "run_id": run_id,
@@ -164,6 +208,7 @@ async def extract_cv(request: Request) -> Response:
                     "warnings": [{"path": w.path, "message": w.message} for w in res.warnings],
                     "confidence": res.confidence,
                     "original_filename": filename,
+                    "elapsed_seconds": elapsed,
                 }
                 yield f"event: done\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
                 break

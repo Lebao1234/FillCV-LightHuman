@@ -96,7 +96,8 @@ Mọi endpoint đều tuân thủ các quy tắc bảo mật từ [CLAUDE.md](fi
       "confidence": {
         "full_name": 0.95
       },
-      "original_filename": "CV_NguyenVanA.pdf"
+      "original_filename": "CV_NguyenVanA.pdf",
+      "elapsed_seconds": 0.85
     }
     ```
   * *Khi xảy ra lỗi:*
@@ -104,8 +105,9 @@ Mọi endpoint đều tuân thủ các quy tắc bảo mật từ [CLAUDE.md](fi
     event: error
     data: {"error": "File CV bị hỏng hoặc không đúng định dạng. Hãy mở file, lưu lại thành PDF hoặc DOCX rồi gửi lại."}
     ```
-* **Mã lỗi HTTP (nếu gửi request sai hoặc vượt dung lượng trước khi stream):**
+* **Mã lỗi HTTP (nếu gửi request sai hoặc vượt dung lượng/tần suất trước khi stream):**
   * `400 Bad Request`: `{"error": "Chị vui lòng đính kèm file CV trước khi gửi."}` hoặc file quá lớn/rỗng.
+  * `429 Too Many Requests`: `{"error": "Bạn đang gửi CV quá nhanh. Vui lòng chờ ít phút rồi thử lại."}` khi gửi vượt quá 15 yêu cầu / phút trên một IP.
 
 ---
 

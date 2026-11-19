@@ -2,10 +2,14 @@
 
 Tiêu đề = dòng ngắn khớp bảng từ khoá (config/extraction_rules.toml), hoặc dòng có CÙNG KIỂU CHỮ với các tiêu đề
 đã khớp (cỡ chữ, đậm, viết hoa) — để nhận cả tiêu đề viết lạ mà không nhầm tên công ty in hoa thành tiêu đề.
+Khi CV có tiêu đề NỔI BẬT (to hơn thân bài / đậm / in hoa), dòng khớp từ khoá nhưng trông như thân bài
+("Thành tựu:", "Tin học văn phòng:") là nhãn bên trong mục, không mở mục mới. Tiêu đề không bao giờ bắt đầu bằng
+chữ thường hay kết thúc bằng dấu câu (đó là phần đuôi của câu bị xuống dòng). Tiêu đề chữ to bị ngắt 2 dòng
+("About" / "me") được ghép lại trước khi tra bảng.
 """
 import re
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from statistics import median
 
 from services.extraction.rules import rulebook
@@ -13,6 +17,8 @@ from services.extraction.rules.pdf_text import Line
 from services.extraction.rules import dates
 
 MAX_HEADING_WORDS = 8
+STANDOUT_SIZE = 1.15          # tiêu đề nổi bật: cỡ chữ >= 115% thân bài (hoặc in đậm / in hoa)
+SPLIT_HEADING_LOOKAHEAD = 4   # tìm nửa sau của tiêu đề bị ngắt dòng trong số dòng kế tiếp này
 
 
 # Một mục thô: tiêu đề + các dòng nội dung (chưa dựng theo schema)
@@ -75,10 +81,47 @@ def _style(line: Line) -> tuple:
     return round(line.size), line.bold, line.upper
 
 
+# Dòng có kiểu chữ nổi bật hơn thân bài (to hơn, đậm hoặc in hoa)
+def _standout(line: Line, body: float) -> bool:
+    return line.size >= body * STANDOUT_SIZE or line.bold or line.upper
+
+
+# Phần đuôi của câu bị xuống dòng: bắt đầu bằng chữ thường hoặc kết thúc bằng dấu câu — không bao giờ là tiêu đề
+def _sentence_tail(text: str) -> bool:
+    t = text.strip()
+    return bool(t) and (t[0].islower() or t.endswith((".", ",", ";")))
+
+
+# Ghép tiêu đề chữ to bị ngắt thành 2 dòng ("About" ... "me") khi hai nửa ghép lại khớp bảng tiêu đề
+def _join_split_headings(lines: list[Line], body: float) -> list[Line]:
+    """Hai nửa có cùng cỡ chữ, cùng trang, cách nhau không quá một dòng; giữa chúng có thể chen dòng của cột
+    bên cạnh (thứ tự đọc theo toạ độ y) — nên tìm nửa sau trong vài dòng kế tiếp."""
+    out, used = [], set()
+    for i, line in enumerate(lines):
+        if i in used:
+            continue
+        if _standout(line, body) and heading_of(line) is None:
+            for j in range(i + 1, min(i + 1 + SPLIT_HEADING_LOOKAHEAD, len(lines))):
+                other = lines[j]
+                if (j in used or other.page != line.page or abs(other.size - line.size) > 0.5
+                        or other.y0 - line.y1 > line.size):
+                    continue
+                joined = replace(line, text=f"{line.text} {other.text}", spans=line.spans + other.spans,
+                                 x1=max(line.x1, other.x1), y1=other.y1)
+                if heading_of(joined):
+                    line = joined
+                    used.add(j)
+                break
+        out.append(line)
+    return out
+
+
 # Dòng có thể là tiêu đề lạ (không có trong bảng) nhưng cùng kiểu với các tiêu đề đã biết
 def _looks_like_heading(line: Line, styles: set, nxt: Line | None) -> bool:
     words = line.text.split()
     if line.bullet or not words or len(words) > 6 or _style(line) not in styles or ":" in line.text.rstrip(":"):
+        return False
+    if _sentence_tail(line.text):
         return False
     if any(c.isdigit() for c in line.text) or dates.find_period(line.text):
         return False
@@ -91,7 +134,12 @@ def _looks_like_heading(line: Line, styles: set, nxt: Line | None) -> bool:
 # Tách danh sách dòng thành (các dòng trước tiêu đề đầu tiên, các mục)
 def split_sections(lines: list[Line]) -> tuple[list[Line], list[RawSection]]:
     """Dòng trước tiêu đề đầu tiên thường là khối tên + liên hệ (xử lý ở giai đoạn lọc thông tin cá nhân)."""
+    body = body_size(lines)
+    lines = _join_split_headings(lines, body)
     hits = [heading_of(l) for l in lines]
+    # CV có tiêu đề nổi bật -> dòng khớp từ khoá nhưng trông như thân bài là nhãn trong mục ("Thành tựu:")
+    if any(h and not h[3] and _standout(ln, body) for ln, h in zip(lines, hits)):
+        hits = [h if not h or h[3] or _standout(ln, body) else None for ln, h in zip(lines, hits)]
     styles = {_style(l) for l, h in zip(lines, hits) if h and not h[3] and not _ambiguous(l.text)}
     # Tiêu đề "nhập nhằng" chỉ được nhận khi cùng kiểu chữ với các tiêu đề rõ ràng (không thì là nhãn trong công việc)
     hits = [None if h and styles and _ambiguous(l.text) and _style(l) not in styles else h
@@ -102,8 +150,18 @@ def split_sections(lines: list[Line]) -> tuple[list[Line], list[RawSection]]:
     main_style = main_style[0][0] if main_style else None
     pre: list[Line] = []
     out: list[RawSection] = []
+    in_col: dict[int, tuple[RawSection, float, int]] = {}   # cột -> (mục đang mở, lề trái, trang) của CV 2 cột
+    carry: RawSection | None = None                          # mục nhận phần tiếp nối ở đầu trang mới
     for i, (line, hit) in enumerate(zip(lines, hits)):
         nxt = lines[i + 1] if i + 1 < len(lines) else None
+        if hit or (styles and not hit and _looks_like_heading(line, styles, nxt)):
+            carry = None
+        elif out and line.col == -1 and len(in_col) == 2 and all(pg < line.page for _, _, pg in in_col.values()):
+            # Đầu trang mới sau trang 2 cột: phần tiếp thuộc mục của cột có cùng lề trái, không phải mục cuối cột phải
+            carry = carry or min(in_col.values(), key=lambda v: abs(v[1] - line.x0))[0]
+        if carry is not None and not hit:
+            carry.lines.append(line)
+            continue
         if (hit and out and not hit[3] and _style(line) != main_style
                 and (out[-1].key == hit[0] or (out[-1].type == hit[1] and hit[1] in ("education", "experience")))):
             continue
@@ -114,13 +172,21 @@ def split_sections(lines: list[Line]) -> tuple[list[Line], list[RawSection]]:
             if inline:
                 out[-1].lines.append(Line(inline, [], line.x0, line.y0, line.x1, line.y1, line.page, line.size,
                                           line.col))
+            if line.col == -1:
+                in_col.clear()       # mục mới ngoài vùng 2 cột -> hết phần tiếp nối của các cột trang trước
         elif styles and _looks_like_heading(line, styles, nxt):
             out.append(RawSection(_clean_title(line.text), None, "auto", "?", confidence=0.6,
                                   reason="tiêu đề mục không có trong bảng từ khoá — loại mục được đoán theo nội dung"))
+            if line.col == -1:
+                in_col.clear()
         elif out:
             out[-1].lines.append(line)
         else:
             pre.append(line)
+            continue
+        if line.col in (0, 1) and out:
+            sec, left, _ = in_col.get(line.col, (None, line.x0, 0))
+            in_col[line.col] = (out[-1], min(left, line.x0) if sec is out[-1] else line.x0, line.page)
     return pre, out
 
 

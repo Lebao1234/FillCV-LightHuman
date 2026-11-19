@@ -1,7 +1,8 @@
 ﻿# Gói services/pdf/: dựng PDF — template.html -> HTML -> Chromium (render_worker, tiến trình riêng).
 """Bước 2: dựng JSON hồ sơ thành HTML rồi xuất PDF chuẩn Light Human.
 
-Hàm chính: build_pdf(cv, project, position, photo_bytes, out_dir) -> Path
+Hàm chính: build_pdf(cv, project, position, photo_bytes, out_dir, lang='vi') -> Path
+`lang` = ngôn ngữ xuất PDF ('vi' | 'en'): nhãn cố định + tiêu đề mục chuẩn theo services/pdf/labels.py.
 """
 import base64
 import io
@@ -11,6 +12,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 import unicodedata
 import zipfile
 from datetime import date, datetime
@@ -25,6 +27,7 @@ from PIL import Image, ImageOps
 from infra.settings import PROJECT_ROOT, IMAGE_EXTENSIONS, company, logo_pdf, render_timeout
 from infra.logging_setup import get_run_id
 from services.extraction import base as extraction
+from services.pdf import labels
 from services.pdf.pdf_utils import pdf_layout  # A3: hàm đo bố cục PDF nằm ở module riêng
 from infra.tokens import FONT, PDF_MARGIN_MM, css_vars
 
@@ -38,6 +41,8 @@ FONT_SIZE_ATTEMPTS = [(11.5, 1.42, False), (11.0, 1.38, True), (10.8, 1.34, True
 # A6 (đã xác nhận là chủ ý): trang cuối dùng < 30% chiều cao -> thử cỡ chữ nhỏ hơn để lấp đầy.
 # KHÁC ngưỡng 15% của checklist (checks.LAST_PAGE_ERROR_FILL): 30% là mức CỐ đạt, 15% mới là lỗi thật.
 LAST_PAGE_MIN_FILL = 0.30
+# Lượt dựng PDF mất quá tỉ lệ này của RENDER_TIMEOUT -> ghi WARNING (máy quá tải / thiếu RAM, sắp chạm hết giờ)
+SLOW_RENDER_RATIO = 0.5
 
 
 # ---------------------------------------------------------------------------
@@ -58,8 +63,8 @@ def today_vn() -> date:
 
 
 # Tên file PDF chuẩn
-def build_filename(position: str, full_name: str, d: date | None = None) -> str:
-    """'LH - CV <Vị trí> - <Họ tên> - <ddmmyyyy>.pdf', không dấu."""
+def build_filename(position: str, full_name: str, d: date | None = None, lang: str = "vi") -> str:
+    """'LH - CV <Vị trí> - <Họ tên> - <ddmmyyyy>.pdf', không dấu. Bản tiếng Anh thêm hậu tố ' - EN'."""
     d = d or today_vn()
 
     # Làm sạch một phần tên file
@@ -68,7 +73,7 @@ def build_filename(position: str, full_name: str, d: date | None = None) -> str:
         x = re.sub(r'[\\/:*?"<>|]', " ", x)       # ký tự cấm trong tên file
         return re.sub(r"\s+", " ", x).strip()
 
-    return f"LH - CV {clean(position)} - {clean(full_name)} - {d:%d%m%Y}.pdf"
+    return f"LH - CV {clean(position)} - {clean(full_name)} - {d:%d%m%Y}{labels.texts(lang)['file_suffix']}.pdf"
 
 
 # ---------------------------------------------------------------------------
@@ -382,7 +387,8 @@ def pdf_css(font_size: float, line_height: float) -> Markup:
 
 # Dựng HTML hồ sơ từ template
 def render_html(cv: dict, project: str, title: str, photo_bytes: bytes | None = None,
-                font_size: float = 11.5, line_height: float = 1.42, compact: bool = False) -> str:
+                font_size: float = 11.5, line_height: float = 1.42, compact: bool = False, lang: str = "vi") -> str:
+    t = labels.texts(lang)
     return _env.get_template("template.html").render(
         cv=cv,
         project=(project or "").strip(),
@@ -392,7 +398,9 @@ def render_html(cv: dict, project: str, title: str, photo_bytes: bytes | None = 
         compact=compact,
         css=pdf_css(font_size, line_height),                       # A7: lề, màu, font từ tokens.py
         company_info=company()["company"],                          # A4: header công ty
-        ref_note=company()["pdf"]["reference_note"],  # A4
+        ref_note=t["reference_note"],                               # A4: company.toml [pdf] / [pdf_en]
+        lang=lang,
+        t=t,                                                         # chữ cố định theo ngôn ngữ xuất
     )
 
 
@@ -407,7 +415,7 @@ def html_to_pdf(html: str, pdf_path: Path) -> None:
 
 
 # Dựng nhiều PDF trong một tiến trình render_worker
-def html_to_pdf_batch(htmls: list[str], pdfs: list[Path]) -> None:
+def html_to_pdf_batch(htmls: list[str], pdfs: list[Path], lang: str = "vi") -> None:
     """Dựng nhiều bản PDF trong MỘT lần gọi render_worker.py (1 tiến trình Python + 1 Chromium).
 
     Tiến trình riêng: xem giải thích trong render_worker.py.
@@ -420,15 +428,20 @@ def html_to_pdf_batch(htmls: list[str], pdfs: list[Path]) -> None:
             jobs.append([str(f), str(pdf)])
         job_list = Path(tmp) / "jobs.json"
         job_list.write_text(json.dumps(jobs), encoding="utf-8")
+        t0 = time.monotonic()
         try:
             result = subprocess.run(
-                [sys.executable, "-m", "services.pdf.render_worker", str(job_list), get_run_id()],
+                [sys.executable, "-m", "services.pdf.render_worker", str(job_list), get_run_id(), lang],   # lang: footer
                 cwd=PROJECT_ROOT,                  # chạy module trong package -> thư mục làm việc phải là gốc dự án
                 capture_output=True, text=True, timeout=render_timeout(),
             )
         except subprocess.TimeoutExpired:
             raise RuntimeError(f"Trình dựng PDF (Chromium) không phản hồi sau {render_timeout()} giây. "
                                "Kiểm tra đã cài 'playwright install chromium' rồi thử lại.")
+    elapsed = time.monotonic() - t0
+    if elapsed > render_timeout() * SLOW_RENDER_RATIO:
+        log.warning("Dựng PDF chậm: %.1f giây cho %d bản (hết giờ ở %d giây) — kiểm tra CPU/RAM hoặc giảm "
+                    "RENDER_MAX_CONCURRENT", elapsed, len(pdfs), render_timeout())
     if result.returncode != 0:
         # S5: chi tiết kỹ thuật (đường dẫn máy, traceback) chỉ vào log, giao diện chỉ hiện câu ngắn
         log.error("render_worker lỗi (mã %s):\n%s", result.returncode, result.stderr[-4000:])
@@ -438,18 +451,19 @@ def html_to_pdf_batch(htmls: list[str], pdfs: list[Path]) -> None:
 
 # Dựng PDF hoàn chỉnh, tự chọn cỡ chữ
 def build_pdf(cv: dict, project: str, position: str, photo_bytes: bytes | None,
-              out_dir: Path, d: date | None = None) -> Path:
-    """Dựng PDF, tự chọn cỡ chữ để không có trang cuối gần trống."""
+              out_dir: Path, d: date | None = None, lang: str = "vi") -> Path:
+    """Dựng PDF bằng ngôn ngữ `lang`, tự chọn cỡ chữ để không có trang cuối gần trống."""
     out_dir.mkdir(parents=True, exist_ok=True)
-    filename = build_filename(position or cv.get("target_title") or "", cv["full_name"], d)
+    filename = build_filename(position or cv.get("target_title") or "", cv["full_name"], d, lang)
+    cv = labels.localize_cv(cv, lang)          # bản sao: tiêu đề mục chuẩn, nhãn, ô số liệu theo ngôn ngữ xuất
     title = filename[:-4]
     target = out_dir / filename
 
     with tempfile.TemporaryDirectory() as tmp:
         # Dựng sẵn cả 3 cỡ chữ trong 1 lần mở Chromium (rẻ hơn nhiều so với mở lại cho mỗi cỡ chữ)
         variants = [Path(tmp) / f"variant_{i}.pdf" for i in range(len(FONT_SIZE_ATTEMPTS))]
-        html_to_pdf_batch([render_html(cv, project, title, photo_bytes, fs, lh, compact) for fs, lh, compact in FONT_SIZE_ATTEMPTS],
-                          variants)
+        html_to_pdf_batch([render_html(cv, project, title, photo_bytes, fs, lh, compact, lang)
+                           for fs, lh, compact in FONT_SIZE_ATTEMPTS], variants, lang)
         chosen = pick_font_size([pdf_layout(p) for p in variants])
         target.write_bytes(write_metadata(variants[chosen].read_bytes()))
     return target

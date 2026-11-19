@@ -199,9 +199,10 @@ def check_fonts(fonts: list[tuple]) -> dict:
 
 
 # Checklist chất lượng cho PDF thành phẩm
-def scan_pdf(pdf_path: Path) -> list[dict]:
-    """Checklist cho PDF thành phẩm. Trả [{muc, ok, detail}]."""
+def scan_pdf(pdf_path: Path, lang: str = "vi") -> list[dict]:
+    """Checklist cho PDF thành phẩm xuất bằng ngôn ngữ `lang`. Trả [{code, item, ok, detail}]."""
     import pymupdf as fitz
+    from services.pdf import labels
     from services.pdf.pdf_utils import pdf_layout
 
     result = []
@@ -217,9 +218,12 @@ def scan_pdf(pdf_path: Path) -> list[dict]:
                    "ok": not violations,
                    "detail": "; ".join(f"{l}: {g}" for l, g in violations) or "Sạch"})
 
-        # 3. Header đúng chuẩn
-        result.append({"code": "header", "item": "Header: có 'HỒ SƠ ỨNG VIÊN', không có 'Candidate Profile'",
-                   "ok": "HỒ SƠ ỨNG VIÊN" in text.upper() and "candidate profile" not in text.lower(),
+        # 3. Header đúng chuẩn: tiêu đề của ngôn ngữ xuất, không lẫn tiêu đề của ngôn ngữ kia (mục 3.1 SKILL.md)
+        want = labels.texts(lang)["doc_title"]
+        other = labels.texts("vi" if lang == "en" else "en")["doc_title"]
+        flat = re.sub(r"\s+", " ", text.upper())          # chữ trích từ PDF có thể xuống dòng giữa cụm
+        result.append({"code": "header", "item": f"Header: có '{want.upper()}', không có '{other}'",
+                   "ok": want.upper() in flat and other.upper() not in flat,
                    "detail": ""})
 
         # 4. Tiêu đề PDF = tên file

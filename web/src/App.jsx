@@ -25,6 +25,7 @@ export default function App() {
   const [project, setProject] = useState('')
   const [position, setPosition] = useState('')
   const [pdfLang, setPdfLang] = useState('vi')
+  const [elapsedSeconds, setElapsedSeconds] = useState(null)
 
   // Trạng thái tiến độ & hàng đợi
   const [isExtracting, setIsExtracting] = useState(false)
@@ -127,7 +128,7 @@ export default function App() {
   )
 
   // Gửi file CV lên backend
-  const handleSubmitCv = ({ file, project: prj, position: pos }) => {
+  const handleSubmitCv = ({ file, project: prj, position: pos, lang: chosenLang }) => {
     setIsExtracting(true)
     setQueuePos(0)
     setActiveStep(0)
@@ -135,6 +136,10 @@ export default function App() {
     setOriginalName(file.name)
     setProject(prj)
     setPosition(pos)
+    setElapsedSeconds(null)
+    if (chosenLang) {
+      setPdfLang(chosenLang)
+    }
 
     extractCv(file, prj, pos, {
       onWait: (posInQueue, what) => {
@@ -146,8 +151,10 @@ export default function App() {
         if (labels && labels.length > 0) setStageLabels(labels)
       },
       onDone: (data) => {
-        const initialLang = data.cv.language || 'vi'
+        const autoLang = data.cv?.language === 'en' ? 'en' : 'vi'
+        const initialLang = chosenLang || autoLang
         setPdfLang(initialLang)
+        setElapsedSeconds(data.elapsed_seconds || null)
         setIsExtracting(false)
         setRunId(data.run_id)
         setCvData(data.cv)
@@ -221,6 +228,8 @@ export default function App() {
     setCheckedGenerated(false)
     setReviewed(false)
     setPdfStatus(null)
+    setPdfLang('vi')
+    setElapsedSeconds(null)
     setActiveTab('pdf')
   }
 
@@ -244,6 +253,8 @@ export default function App() {
             originalName={originalName}
             project={project}
             position={position}
+            pdfLang={pdfLang}
+            elapsedSeconds={elapsedSeconds}
             summary={summary}
             review={review}
             error={error}

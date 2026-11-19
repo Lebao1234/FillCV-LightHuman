@@ -149,10 +149,32 @@ def test_extract_cv_sse(monkeypatch):
         assert "done" in event_names
 
         done_event = next(e[1] for e in events if e[0] == "done")
-        required_keys = {"run_id", "cv", "has_photo", "warnings", "confidence", "original_filename"}
+        required_keys = {"run_id", "cv", "has_photo", "warnings", "confidence", "original_filename", "elapsed_seconds"}
         assert required_keys.issubset(done_event.keys())
         assert done_event["has_photo"] is True
         assert done_event["cv"]["full_name"] == fake_cv["full_name"]
+        assert isinstance(done_event["elapsed_seconds"], (int, float))
+
+
+# Test endpoint /api/cv/extract chặn khi vượt quá giới hạn tần suất (rate limiting)
+def test_extract_cv_rate_limiting(monkeypatch):
+    from api import routes
+    # Tạo limiter với ngưỡng thấp để test: 2 requests trong 60s
+    limiter = routes.ExtractRateLimiter(max_requests=2, window_seconds=60.0)
+    monkeypatch.setattr(routes, "_extract_rate_limiter", limiter)
+
+    with TestClient(app) as client:
+        file_content = b"%PDF-1.4 dummy"
+        files = {"file": ("test.pdf", io.BytesIO(file_content), "application/pdf")}
+        # Request 1 & 2 được tiếp nhận
+        client.post("/api/cv/extract", files=files, data={})
+        files2 = {"file": ("test.pdf", io.BytesIO(file_content), "application/pdf")}
+        client.post("/api/cv/extract", files=files2, data={})
+        # Request thứ 3 phải bị chặn 429
+        files3 = {"file": ("test.pdf", io.BytesIO(file_content), "application/pdf")}
+        res3 = client.post("/api/cv/extract", files=files3, data={})
+        assert res3.status_code == 429
+        assert "Bạn đang gửi CV quá nhanh" in res3.json()["error"]
 
 
 # Test endpoint /api/pdf/build với monkeypatch

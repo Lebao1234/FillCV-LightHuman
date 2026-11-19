@@ -54,6 +54,7 @@ class PdfResult:
     filename: str
     checklist: list[dict]
     summary: str
+    lang: str = "vi"          # ngôn ngữ xuất của bản PDF này
 
 
 # Các giai đoạn sau phần trích xuất (do pipeline chạy, chung cho mọi bộ trích xuất)
@@ -163,11 +164,12 @@ def queue_length() -> int:
 
 # Dựng PDF (qua hàng đợi dùng chung) + checklist + tóm tắt
 def make_pdf(cv: dict, project: str, position: str, photo: bytes | None,
-             on_wait: Callable[[int], None] | None = None) -> PdfResult:
+             on_wait: Callable[[int], None] | None = None, lang: str = "vi") -> PdfResult:
     """Dựng PDF vào thư mục tạm + checklist + tin nhắn tóm tắt. Lỗi -> ném ra (app ghi log và báo).
 
     Tối đa RENDER_MAX_CONCURRENT lượt dựng chạy cùng lúc trên toàn app; người tới sau xếp hàng.
     Phải chờ thì gọi `on_wait(queue_pos)` trước để giao diện báo "đang xếp hàng".
+    `lang`: ngôn ngữ xuất PDF ('vi' | 'en') — nhãn cố định, tiêu đề mục chuẩn, tên file, checklist header.
     """
     global _queue_length
     if not _render_slots.acquire(blocking=False):
@@ -186,18 +188,35 @@ def make_pdf(cv: dict, project: str, position: str, photo: bytes | None,
                 _queue_length -= 1
     try:
         with tempfile.TemporaryDirectory() as tmp:
-            p = render.build_pdf(cv, project, position, photo, Path(tmp))
-            checklist = checks.scan_pdf(p)
-            result = PdfResult(p.read_bytes(), p.name, checklist, summary_message(cv, project, position))
+            p = render.build_pdf(cv, project, position, photo, Path(tmp), lang=lang)
+            checklist = checks.scan_pdf(p, lang=lang)
+            result = PdfResult(p.read_bytes(), p.name, checklist, summary_message(cv, project, position), lang)
     finally:
         _render_slots.release()
-    log.info("Đã dựng PDF, checklist %d/%d đạt", sum(r["ok"] for r in checklist), len(checklist))
+    log.info("Đã dựng PDF (%s), checklist %d/%d đạt", lang, sum(r["ok"] for r in checklist), len(checklist))
     return result
+
+
+# Lưu bản sao khi bấm Tải PDF; lỗi thì ghi log an toàn và trả câu báo cho người dùng
+def store_export(folder: Path, filename: str, pdf_bytes: bytes, **kwargs) -> str | None:
+    """Gọi save_copy trong callback nút Tải. Trả None khi lưu được, hoặc câu báo lỗi (không chứa đường dẫn).
+
+    Không ghi chuỗi lỗi/traceback vào log: thông báo của OSError chứa đường dẫn = họ tên ứng viên (S6).
+    Lỗi không làm hỏng lượt tải: file PDF vẫn tải về máy người dùng bình thường.
+    """
+    try:
+        save_copy(folder, filename, pdf_bytes, **kwargs)
+    except Exception as e:
+        log.error("Không lưu được bản sao vào thư mục output: %s (errno %s)", type(e).__name__,
+                  getattr(e, "errno", None))
+        hint = " Thư mục lưu không có quyền ghi." if isinstance(e, PermissionError) else ""
+        return f"File PDF vẫn tải về máy bình thường, nhưng máy chủ chưa lưu được bản sao.{hint} Hãy báo người quản trị."
+    return None
 
 
 # Lưu bản sao PDF đã xuất, không ghi đè
 def save_copy(folder: Path, filename: str, pdf_bytes: bytes, run_id: str | None = None,
-              cv: dict | None = None, project: str = "", position: str = "") -> Path:
+              cv: dict | None = None, project: str = "", position: str = "", lang: str = "vi") -> Path:
     """Lưu bản sao PDF đã xuất; trùng tên thì thêm hậu tố giờ (Q5), không ghi đè.
 
     Có `cv` -> lưu kèm file .json cùng tên (hồ sơ đúng như lúc dựng PDF) để sau này sửa lại không phải đọc CV gốc.
@@ -210,14 +229,14 @@ def save_copy(folder: Path, filename: str, pdf_bytes: bytes, run_id: str | None 
     target = unique_path(folder, filename)
     target.write_bytes(pdf_bytes)
     if cv is not None:
-        target.with_suffix(".json").write_text(export_json(cv, project, position), encoding="utf-8")
+        target.with_suffix(".json").write_text(export_json(cv, project, position, lang), encoding="utf-8")
     log.info("Đã lưu bản xuất vào thư mục output (%s%s)", "tên chuẩn" if target.name == filename else "thêm hậu tố giờ",
              ", kèm JSON" if cv is not None else "")
     return target
 
 
 # Nội dung file JSON lưu kèm PDF
-def export_json(cv: dict, project: str, position: str) -> str:
+def export_json(cv: dict, project: str, position: str, lang: str = "vi") -> str:
     """JSON lưu kèm PDF: thông tin lượt xuất + hồ sơ (đúng schema CVData, không có ảnh chân dung).
 
     Hồ sơ nằm riêng trong khoá "cv" vì CVData cấm trường thừa; đọc lại thì lấy data["cv"] rồi CVData.model_validate.
@@ -228,6 +247,7 @@ def export_json(cv: dict, project: str, position: str) -> str:
         "extractor": extraction.extractor_version(),
         "project": project,
         "position": position,
+        "pdf_language": lang,          # ngôn ngữ xuất PDF; "cv" là hồ sơ gốc chưa đổi nhãn
         "cv": cv,
     }
     return json.dumps(record, ensure_ascii=False, indent=2)
@@ -253,9 +273,9 @@ def validate_structure(cv: dict) -> tuple[dict | None, list[str]]:
 
 
 # Mã băm nội dung để biết PDF còn khớp không
-def content_fingerprint(cv: dict, project: str, position: str, photo: bytes | None) -> str:
-    """Mã nhận diện nội dung đầu vào của PDF -> biết PDF đã xuất còn khớp màn hình không."""
-    payload = json.dumps([cv, project, position], ensure_ascii=False, sort_keys=True).encode("utf-8")
+def content_fingerprint(cv: dict, project: str, position: str, photo: bytes | None, lang: str = "vi") -> str:
+    """Mã nhận diện nội dung đầu vào của PDF (cả ngôn ngữ xuất) -> biết PDF đã xuất còn khớp màn hình không."""
+    payload = json.dumps([cv, project, position, lang], ensure_ascii=False, sort_keys=True).encode("utf-8")
     return hashlib.sha256(payload + (photo or b"")).hexdigest()
 
 

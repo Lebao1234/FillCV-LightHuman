@@ -15,3 +15,8 @@ domain = "lighthuman.vn"          # tên miền được phép xuất hiện tro
 # {name} = tên công ty (in đậm màu navy ở footer)
 footer_intro = "Hồ sơ do {name} giới thiệu · Thông tin liên hệ của ứng viên được bảo mật"
 reference_note = "Thông tin liên hệ người tham chiếu sẽ được Light Human cung cấp khi Quý khách hàng có nhu cầu kiểm tra tham chiếu."
+
+# Bản tiếng Anh của [pdf] — dùng khi xuất PDF bằng tiếng Anh (cùng khoá với [pdf])
+[pdf_en]
+footer_intro = "Profile presented by {name} · Candidate contact details are kept confidential"
+reference_note = "Contact details of the referees will be provided by Light Human upon request for reference checks."

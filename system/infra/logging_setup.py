@@ -12,13 +12,25 @@ import logging
 import os
 import threading
 import uuid
+from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 DEFAULT_LOG_DIR = Path(__file__).resolve().parent.parent / "data" / "logs"   # gốc dự án / data / logs
 LOG_FILE_MAX_BYTES = 1_000_000   # ~1 MB mỗi file
 LOG_BACKUP_COUNT = 5                # giữ app.log.1 … app.log.5
 LOG_FORMAT = "%(asctime)s %(levelname)-7s [%(run_id)s] %(name)s: %(message)s"
+# Giờ trong log luôn là giờ Việt Nam: container Docker mặc định UTC -> lệch 7 tiếng so với máy chạy trực tiếp
+LOG_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
+
+
+# Formatter ghi giờ theo LOG_TZ, không phụ thuộc múi giờ của hệ điều hành
+class _LocalTimeFormatter(logging.Formatter):
+    # Định dạng thời điểm của bản ghi theo giờ Việt Nam
+    def formatTime(self, record: logging.LogRecord, datefmt: str | None = None) -> str:
+        t = datetime.fromtimestamp(record.created, LOG_TZ)
+        return t.strftime(datefmt) if datefmt else f"{t:%Y-%m-%d %H:%M:%S},{int(record.msecs):03d}"
 
 _run_id: contextvars.ContextVar[str] = contextvars.ContextVar("run_id", default="-")
 
@@ -79,7 +91,7 @@ def setup_logging(filename: str = "app.log", level: int = logging.INFO) -> Path:
                 return path
         path.parent.mkdir(parents=True, exist_ok=True)
         h = RotatingFileHandler(path, maxBytes=LOG_FILE_MAX_BYTES, backupCount=LOG_BACKUP_COUNT, encoding="utf-8")
-        h.setFormatter(logging.Formatter(LOG_FORMAT))
+        h.setFormatter(_LocalTimeFormatter(LOG_FORMAT))
         h.addFilter(_RunIdFilter())
         root.addHandler(h)
         if root.level == logging.NOTSET or root.level > level:
