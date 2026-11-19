@@ -4,9 +4,11 @@ import ChatPanel from './components/ChatPanel.jsx'
 import StageScreen from './components/StageScreen.jsx'
 import PdfPanel from './components/PdfPanel.jsx'
 import OriginalCvPreview from './components/OriginalCvPreview.jsx'
+import ProfileForm from './components/profile/ProfileForm.jsx'
 import {
   getConfig,
   extractCv,
+  validateCv,
   buildPdf,
   getPdfStatus,
 } from './api/client.js'
@@ -40,9 +42,10 @@ export default function App() {
   const [summary, setSummary] = useState('')
 
   // Validation & Review
-  const [structureErrors] = useState([])
-  const [violations] = useState([])
-  const [, setReview] = useState(null)
+  const [structureErrors, setStructureErrors] = useState([])
+  const [violations, setViolations] = useState([])
+  const [review, setReview] = useState(null)
+  const [photoUrl, setPhotoUrl] = useState(null)
 
   // Xác nhận duyệt
   const [checkedGenerated, setCheckedGenerated] = useState(false)
@@ -173,6 +176,7 @@ export default function App() {
         setRunId(data.run_id)
         setCvData(data.cv)
         setCv0(data.cv)
+        setPhotoUrl(data.photo_url)
         setOriginalName(data.original_filename)
         setProject(prj)
         setPosition(pos || data.cv.target_title || '')
@@ -228,17 +232,31 @@ export default function App() {
     }
   }
 
+  // Cập nhật nội dung hồ sơ và tự động validate
+  const handleCvChange = (newCv) => {
+    setCvData(newCv)
+    validateCv(newCv, project, position)
+      .then((val) => {
+        setStructureErrors(val.structure_errors || [])
+        setViolations(val.violations || [])
+      })
+      .catch((err) => console.error('Lỗi validate:', err))
+  }
+
   // Làm mới ứng dụng
   const handleReset = () => {
     setRunId(null)
     setCvData(null)
     setCv0(null)
+    setPhotoUrl(null)
     setOriginalName('')
     setProject('')
     setPosition('')
     setPdfData(null)
     setSummary('')
     setChatMessages([])
+    setStructureErrors([])
+    setViolations([])
     setReview(null)
     setCheckedGenerated(false)
     setReviewed(false)
@@ -328,12 +346,18 @@ export default function App() {
               )}
 
               {activeTab === 'edit' && (
-                <div style={{ padding: 'var(--sp-4)', background: 'var(--white)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)' }}>
-                  <h4 style={{ margin: '0 0 var(--sp-2)' }}>Form chỉnh sửa hồ sơ</h4>
-                  <p style={{ color: 'var(--muted)', fontSize: 'var(--fs-sm)' }}>
-                    Tính năng chỉnh sửa chi tiết từng mục theo loại sẽ được triển khai đầy đủ ở Giai đoạn 3.
-                  </p>
-                </div>
+                <ProfileForm
+                  cv={cvData}
+                  onChangeCv={handleCvChange}
+                  project={project}
+                  onChangeProject={setProject}
+                  position={position}
+                  onChangePosition={setPosition}
+                  runId={runId}
+                  photoUrl={photoUrl}
+                  onChangePhoto={setPhotoUrl}
+                  review={review}
+                />
               )}
 
               {activeTab === 'original' && (
