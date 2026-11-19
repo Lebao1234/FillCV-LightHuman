@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import Header from './components/Header.jsx'
-import ChatPanel from './components/ChatPanel.jsx'
+import ExtractionPanel from './components/ExtractionPanel.jsx'
 import StageScreen from './components/StageScreen.jsx'
 import PdfPanel from './components/PdfPanel.jsx'
 import OriginalCvPreview from './components/OriginalCvPreview.jsx'
@@ -34,8 +34,8 @@ export default function App() {
   const [activeStep, setActiveStep] = useState(0)
   const [stageLabels, setStageLabels] = useState([])
 
-  // Lịch sử Chat
-  const [chatMessages, setChatMessages] = useState([])
+  // Lỗi nếu có
+  const [error, setError] = useState(null)
 
   // Kết quả bản PDF
   const [pdfData, setPdfData] = useState(null)
@@ -72,45 +72,32 @@ export default function App() {
       })
   }, [])
 
-  // Đánh giá trạng thái bản PDF qua backend
-  const updatePdfStatus = useCallback(
-    async (currentPdfData, curFingerprint, isCheckedGen, isRev, curViolations, curStructErrors) => {
-      if (!currentPdfData) {
-        setPdfStatus({
-          outdated: false,
-          pdf_dirty: false,
-          can_download: false,
-          pill_kind: 'idle',
-          pill_text: 'Chưa dựng',
-        })
-        return
-      }
-
-      try {
-        const res = await getPdfStatus({
-          has_pdf: Boolean(currentPdfData.filename),
-          pdf_fingerprint: currentPdfData.fingerprint,
-          current_fingerprint: curFingerprint || currentPdfData.fingerprint,
-          checklist: currentPdfData.checklist,
-          has_violations: (curViolations || violations).length > 0,
-          has_structure_errors: (curStructErrors || structureErrors).length > 0,
-          checked_generated: isCheckedGen,
-          reviewed: isRev,
-        })
-        setPdfStatus(res)
-      } catch (err) {
-        console.error('Lỗi tính trạng thái PDF:', err)
-      }
-    },
-    [violations, structureErrors]
-  )
-
-  // Cập nhật trạng thái khi các checkbox thay đổi
+  // Cập nhật trạng thái khi các checkbox hoặc dữ liệu thay đổi
   useEffect(() => {
-    if (pdfData) {
-      updatePdfStatus(pdfData, currentFingerprint, checkedGenerated, reviewed)
+    if (!pdfData) return
+    let active = true
+
+    getPdfStatus({
+      has_pdf: Boolean(pdfData.filename),
+      pdf_fingerprint: pdfData.fingerprint,
+      current_fingerprint: currentFingerprint || pdfData.fingerprint,
+      checklist: pdfData.checklist,
+      has_violations: violations.length > 0,
+      has_structure_errors: structureErrors.length > 0,
+      checked_generated: checkedGenerated,
+      reviewed: reviewed,
+    })
+      .then((res) => {
+        if (active) setPdfStatus(res)
+      })
+      .catch((err) => {
+        console.error('Lỗi tính trạng thái PDF:', err)
+      })
+
+    return () => {
+      active = false
     }
-  }, [checkedGenerated, reviewed, pdfData, currentFingerprint, updatePdfStatus])
+  }, [checkedGenerated, reviewed, pdfData, currentFingerprint, violations, structureErrors])
 
   // Dựng PDF
   const handleBuildPdf = useCallback(
@@ -128,16 +115,9 @@ export default function App() {
         setCurrentFingerprint(res.fingerprint)
         setSummary(res.summary || '')
         setPdfStatus(res.status)
+        setError(null)
       } catch (err) {
-        setChatMessages((prev) => [
-          ...prev,
-          {
-            role: 'assistant',
-            kind: 'error',
-            title: 'Dựng PDF thất bại.',
-            text: err.message,
-          },
-        ])
+        setError(err.message || 'Dựng PDF thất bại.')
       } finally {
         setIsBuildingPdf(false)
         setQueuePos(0)
@@ -151,18 +131,10 @@ export default function App() {
     setIsExtracting(true)
     setQueuePos(0)
     setActiveStep(0)
-
-    // Thêm tin nhắn file của user vào chat
-    setChatMessages((prev) => [
-      ...prev,
-      {
-        role: 'user',
-        kind: 'file',
-        filename: file.name,
-        project: prj,
-        position: pos,
-      },
-    ])
+    setError(null)
+    setOriginalName(file.name)
+    setProject(prj)
+    setPosition(pos)
 
     extractCv(file, prj, pos, {
       onWait: (posInQueue, what) => {
@@ -195,35 +167,13 @@ export default function App() {
         setCheckedGenerated(!hasSelfCreated)
         setReviewed(false)
 
-        // Thêm tin nhắn ghi chú của trợ lý vào chat
-        setChatMessages((prev) => [
-          ...prev,
-          {
-            role: 'assistant',
-            kind: 'notes',
-            name: data.cv.full_name,
-            notes: data.cv.model_notes,
-            salary: data.cv.expected_salary,
-            hasPhoto: data.has_photo,
-            review: (data.warnings || []).map((w) => w.message),
-          },
-        ])
-
         // Dựng PDF tự động lần đầu
         handleBuildPdf(data.cv, data.run_id, prj, pos || data.cv.target_title || '', initialLang)
       },
       onError: (errMsg) => {
         setIsExtracting(false)
         setQueuePos(0)
-        setChatMessages((prev) => [
-          ...prev,
-          {
-            role: 'assistant',
-            kind: 'error',
-            title: 'Không đọc được CV.',
-            text: errMsg,
-          },
-        ])
+        setError(errMsg)
       },
     })
   }
@@ -247,7 +197,6 @@ export default function App() {
         setViolations(viols)
         if (val.fingerprint) {
           setCurrentFingerprint(val.fingerprint)
-          updatePdfStatus(pdfData, val.fingerprint, checkedGenerated, reviewed, viols, structErrs)
         }
       })
       .catch((err) => console.error('Lỗi validate:', err))
@@ -263,8 +212,9 @@ export default function App() {
     setProject('')
     setPosition('')
     setPdfData(null)
+    setCurrentFingerprint('')
     setSummary('')
-    setChatMessages([])
+    setError(null)
     setStructureErrors([])
     setViolations([])
     setReview(null)
@@ -281,16 +231,26 @@ export default function App() {
       <Header logoB64={config?.logo_header_b64} />
 
       <main className="app-grid">
-        {/* Cột trái: Khung Chat và Form Upload */}
+        {/* Cột trái: Trạng thái bóc tách CV (Stateful Pipeline & Dashboard) */}
         <section className="col-left">
-          <ChatPanel
-            chatMessages={chatMessages}
+          <ExtractionPanel
             isExtracting={isExtracting}
-            onReset={handleReset}
-            onSubmitCv={handleSubmitCv}
+            isBuildingPdf={isBuildingPdf}
+            queuePos={queuePos}
+            queueWhat={queueWhat || (isBuildingPdf ? 'dựng PDF' : 'đọc CV')}
+            activeStep={activeStep}
+            stageLabels={stageLabels}
+            cvData={cvData}
+            originalName={originalName}
+            project={project}
+            position={position}
+            summary={summary}
+            review={review}
+            error={error}
             structureErrors={structureErrors}
             violations={violations}
-            summary={summary}
+            onSubmitCv={handleSubmitCv}
+            onReset={handleReset}
           />
         </section>
 
