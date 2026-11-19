@@ -10,6 +10,8 @@ Dùng ở:
 Tài liệu: docs/design-system.md
 """
 
+from pathlib import Path
+
 # ---------------------------------------------------------------------------
 # Màu
 # ---------------------------------------------------------------------------
@@ -121,7 +123,21 @@ def markdown_table() -> str:
     return "\n".join(out)
 
 
+# Sinh file CSS chứa biến token cho ứng dụng React web
+def write_web_tokens(path: Path | None = None) -> Path:
+    """Sinh web/src/tokens.css từ nguồn token duy nhất này."""
+    target = path or (Path(__file__).resolve().parent.parent.parent / "web" / "src" / "tokens.css")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    content = "/* Biến CSS tự động sinh từ infra/tokens.py — NGUỒN DUY NHẤT */\n" + css_vars("web") + "\n"
+    target.write_text(content, encoding="utf-8")
+    return target
+
+
 if __name__ == "__main__":
     import sys
     sys.stdout.reconfigure(encoding="utf-8")
-    print(markdown_table())
+    if "--write" in sys.argv or "--css" in sys.argv:
+        dest = write_web_tokens()
+        print(f"Đã sinh {dest}")
+    else:
+        print(markdown_table())

@@ -1,21 +1,21 @@
 # Hệ thống giao diện – Hồ sơ ứng viên Light Human
 
-Tài liệu cho người sửa giao diện web app (`app.py`) và mẫu hồ sơ PDF (`template.html`).
+Tài liệu cho người sửa giao diện web app (`web/`) và mẫu hồ sơ PDF (`template.html`).
 
 ## Nguyên tắc
 
-1. **Một nguồn token duy nhất: [`infra/tokens.py`](../infra/tokens.py).** Web app, mẫu PDF, footer PDF và theme Streamlit cùng lấy giá trị từ đây. Không viết mã màu, cỡ chữ, khoảng cách hay bo góc trực tiếp vào CSS. Test `tests/test_design_tokens.py` sẽ báo lỗi nếu có.
+1. **Một nguồn token duy nhất: [`infra/tokens.py`](../system/infra/tokens.py).** Web app (`web/src/tokens.css`), mẫu PDF (`css_vars("pdf")`) và footer PDF cùng lấy giá trị từ đây. Không viết mã màu, cỡ chữ, khoảng cách hay bo góc trực tiếp vào CSS/JSX.
 2. **Mẫu PDF theo đúng SKILL.md.** Token PDF (`css_vars("pdf")`) giữ nguyên giá trị mục 5 SKILL.md. Sửa token mà làm đổi PDF tức là đổi chuẩn hồ sơ, cần chị Trâm duyệt.
 3. **Navy là màu nhấn duy nhất, gold chỉ để trang trí.** Gold sáng (`--gold`) dùng cho vạch, chấm đầu dòng. Khi cần chữ màu vàng, dùng `--gold-text`.
 4. **Chữ trên nền phải đạt WCAG AA (≥ 4.5:1).** Mọi cặp chữ/nền đang dùng được liệt kê trong `tokens.TEXT_BG_PAIRS` và được test kiểm tra.
-5. **Không emoji.** Icon dùng SVG nét 1.5px hoặc Material Symbols của Streamlit (`icon=":material/...:"`).
+5. **Không emoji.** Icon dùng SVG nét 1.5px.
 
 ## Cách đổi một token
 
 1. Sửa giá trị trong `infra/tokens.py`.
-2. Nếu là `navy`, `white`, `soft`, `ink`, `line` hoặc `r-md`: sửa luôn `.streamlit/config.toml`, vì file này không đọc được Python.
+2. Chạy `python -m infra.tokens --write` (từ `system/`) để cập nhật tự động `web/src/tokens.css`.
 3. Chạy `python -m infra.tokens` (ở thư mục gốc dự án), rồi dán kết quả vào phần **Bảng token** bên dưới.
-4. Chạy `python -m pytest`. Test kiểm tra tương phản, theme, CSS không có giá trị cứng, và tài liệu đã cập nhật.
+4. Chạy `python -m pytest` và `npm run build` trong `web/`. Test kiểm tra tương phản và CSS không có giá trị cứng.
 
 ## Bảng token
 
