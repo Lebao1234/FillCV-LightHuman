@@ -35,14 +35,15 @@
 
 ## 🛠 Cài đặt
 
-**Yêu cầu:** Python 3.13+, Windows
+**Yêu cầu:** Python 3.13+, Node.js 20+, Windows / Linux
 
-Mã nguồn nằm trong thư mục `system/` — **mọi lệnh Python dưới đây chạy từ thư mục đó**:
+### 1. Cài đặt Backend (Python)
+Mã nguồn backend nằm trong thư mục `system/`:
 
 ```powershell
 cd system
 
-# Cài thư viện
+# Cài thư viện backend
 python -m pip install -r requirements.txt
 
 # Cài trình duyệt Chromium (dùng để dựng PDF)
@@ -50,7 +51,7 @@ python -m playwright install chromium
 ```
 
 > **Lưu ý:**
-> - Phiên bản thư viện được ghim trong `requirements.txt` — nâng cấp thì đổi số, cài lại, chạy `pytest`
+> - Phiên bản thư viện được ghim trong `requirements.txt`
 > - **Không dùng** `opencv-python-headless` bản 5.x (đã bỏ bộ nhận diện khuôn mặt Haar cascade mà app dùng để cắt ảnh chân dung)
 
 **Cho người phát triển** (thêm pytest, coverage, python-docx):
@@ -59,28 +60,58 @@ python -m playwright install chromium
 python -m pip install -r requirements-dev.txt
 ```
 
+### 2. Cài đặt Frontend (Web React)
+Mã nguồn giao diện nằm trong thư mục `web/`:
+
+```powershell
+cd web
+npm install
+```
+
 ---
 
 ## 🚀 Chạy
 
+### Chạy môi trường phát triển (Dev)
+
+Chạy song song 2 terminal:
+
 ```powershell
+# Terminal 1: Backend API (cổng 8000)
 cd system
-python -m streamlit run app.py
+python -m api.server
+
+# Terminal 2: Frontend Vite (cổng 5173, proxy tự động sang 8000)
+cd web
+npm run dev
 ```
 
-Trình duyệt sẽ mở `http://localhost:8501`.
+Mở trình duyệt tại `http://localhost:5173`.
 
-**Chạy bằng Docker** (từ thư mục gốc repo; PDF đã xuất và log nằm ở `data/` của thư mục gốc). App chạy sau nginx (`nginx/conf.d/fillcv.conf`), nginx yêu cầu đăng nhập; cổng 8501 không mở ra ngoài.
+### Chạy bản build sản xuất cục bộ
 
 ```powershell
-# 1. Tạo tài khoản đăng nhập. KHÔNG dùng ">" trong PowerShell 5.1 (ghi UTF-16, nginx không đọc được)
+# 1. Build web ra web/dist
+cd web
+npm run build
+
+# 2. Khởi chạy Starlette API (tự động serve web/dist tại cổng 8000)
+cd ..\system
+python -m api.server
+```
+
+Mở trình duyệt tại `http://localhost:8000`.
+
+**Chạy bằng Docker** (từ thư mục gốc repo; PDF đã xuất và log nằm ở `data/` của thư mục gốc). App chạy sau nginx (`nginx/conf.d/fillcv.conf`), cổng 8000 của backend chỉ mở trong mạng Docker cho nginx.
+
+```powershell
+# 1. Tạo tài khoản đăng nhập (tuỳ chọn khi bật lại basic auth trong nginx)
 docker run --rm httpd:2.4-alpine htpasswd -nbB <tên> <mật-khẩu> | Out-File -Encoding ascii nginx/.htpasswd
-#    Thêm người dùng: thay Out-File bằng  Add-Content -Encoding ascii nginx/.htpasswd
 # 2. Build + chạy
 docker compose up -d --build
 ```
 
-**Xem thử trên nền tảng một container** (snapdeploy, Render, Railway…): dùng `Dockerfile` ở thư mục gốc (đọc biến `PORT`, mặc định 1 lượt dựng PDF cho gói 512 MB RAM). Không có nginx/đăng nhập, không giữ file sau khi khởi động lại → **chỉ dùng CV giả**.
+**Xem thử trên nền tảng một container** (snapdeploy, Render, Railway…): dùng `Dockerfile` ở thư mục gốc (multi-stage build Node cho `web/` rồi chạy Starlette API, đọc biến `PORT`, mặc định 1 lượt dựng PDF cho gói 512 MB RAM). Không có nginx/đăng nhập, không giữ file sau khi khởi động lại → **chỉ dùng CV giả**.
 
 Truy cập `http://<máy chủ>/`. Trên máy chủ Linux, tạo sẵn `data/output` và `data/logs` thuộc UID 1000 (`sudo chown -R 1000:1000 data`) để container ghi được. Đổi `MAX_UPLOAD_MB` thì đổi cả `client_max_body_size` trong cấu hình nginx.
 
@@ -105,7 +136,7 @@ Truy cập `http://<máy chủ>/`. Trên máy chủ Linux, tạo sẵn `data/out
 
 ### Bước 3 — Tải PDF
 
-Tick 2 ô xác nhận → bấm **Tải PDF** (bản sao PDF + file `.json` hồ sơ cùng tên lưu vào `data/output`; trùng tên thì thêm hậu tố giờ, không ghi đè).
+Chọn **Ngôn ngữ PDF** (Tiếng Việt / English — bản tiếng Anh đổi nhãn cố định, tiêu đề mục chuẩn, ô số liệu, footer và thêm ` - EN` vào tên file; dịch ngay trên máy chủ, nội dung tự do giữ nguyên để tự sửa) → tick 2 ô xác nhận → bấm **Tải PDF** (bản sao PDF + file `.json` hồ sơ cùng tên lưu vào `data/output`; trùng tên thì thêm hậu tố giờ, không ghi đè).
 
 > **Nút Tải PDF bị khoá khi:** còn số điện thoại / email / link / ngày sinh (trong nội dung, tên dự án, vị trí hoặc trong chính file PDF), hồ sơ chưa hợp lệ, hoặc PDF chưa cập nhật theo nội dung mới — app sẽ chỉ ra chỗ cần sửa.
 
@@ -122,8 +153,8 @@ Tick 2 ô xác nhận → bấm **Tải PDF** (bản sao PDF + file `.json` hồ
 | `config/company.toml` | Tên, địa chỉ, SĐT, email, website Light Human + câu footer, ghi chú người tham chiếu. **Nguồn duy nhất**: header PDF, footer và bộ lọc thông tin nhạy cảm cùng đọc từ đây — đổi SĐT công ty chỉ cần sửa file này |
 | `config/extraction_rules.toml` | Bảng từ khoá của bộ đọc theo luật (viết không dấu): tiêu đề mục → loại mục, nhãn thông tin nhạy cảm cần bỏ, nhãn dòng phụ/nhóm việc, từ nhận ra công ty/chức danh/văn bằng. Nhận thêm một cách viết = thêm vào đây |
 | `prompts/schema.json` | Cấu trúc JSON hồ sơ (phải khớp `services/ai/models.py`) |
-| `infra/tokens.py` | Màu, chữ, khoảng cách, lề trang PDF — dùng chung cho web app, mẫu PDF, footer. Xem `docs/design-system.md` |
-| `.streamlit/config.toml` | Theme Streamlit + `[server]` (localhost, giới hạn upload). Màu phải khớp `infra/tokens.py` |
+| `infra/tokens.py` | Màu, chữ, khoảng cách, lề trang PDF — dùng chung cho giao diện web, mẫu PDF, footer. Sinh file `web/src/tokens.css` bằng lệnh `python -m infra.tokens --write`. Xem `docs/design-system.md` |
+| `docs/api.md` | Hợp đồng API độc lập (endpoint, method, request/response mẫu, mã lỗi) kết nối backend và frontend |
 
 ### Biến môi trường
 
@@ -131,10 +162,12 @@ Không đặt = dùng mặc định. Dự án **không đọc** file `.env`.
 
 | Biến | Mặc định | Ý nghĩa |
 |---|---|---|
+| `HOST` | `127.0.0.1` | Địa chỉ IP bind server backend (trong Docker đặt `0.0.0.0`) |
+| `PORT` | `8000` | Cổng HTTP lắng nghe |
 | `CV_EXTRACTOR` | `rules` | Bộ trích xuất CV: `rules` (đọc PDF theo luật) hoặc `manual` (luôn khung trống nhập tay). Tên + phiên bản ghi vào metadata PDF |
 | `EXTRACT_MAX_CONCURRENT` | `2` | Số lượt đọc CV (trích xuất + lấy ảnh chân dung) chạy cùng lúc (người tới sau **xếp hàng**) |
 | `EXTRACT_QUEUE_TIMEOUT` | `300` | Giây chờ tối đa khi xếp hàng đọc CV |
-| `MAX_UPLOAD_MB` | `20` | Dung lượng tối đa file tải lên (phải khớp `server.maxUploadSize`) |
+| `MAX_UPLOAD_MB` | `20` | Dung lượng tối đa file tải lên (phải khớp cấu hình proxy) |
 | `MAX_CV_PAGES` | `20` | Số trang tối đa của CV PDF được đọc tự động và xem trước; dài hơn → khung nhập tay, tab CV gốc chỉ vẽ các trang đầu |
 | `OUTPUT_RETENTION_DAYS` | `30` | Số ngày giữ PDF + JSON đã xuất (`0` = không tự xoá) |
 | `OUTPUT_DIR` | `data/output` | Thư mục lưu bản sao PDF + JSON |
@@ -155,67 +188,59 @@ Bố cục repo:
 
 ```
 README.md  CLAUDE.md  .gitignore  .vscode/
-docker-compose.yml      ← Chạy app bằng Docker (build từ system/)
+docker-compose.yml      ← Chạy app bằng Docker (build multi-stage)
 .github/                ← CI/CD (workflows) + dependabot
-docs/                   ← Tài liệu, gồm SKILL.md (quy chuẩn hồ sơ PDF)
-data/                   ← PDF đã xuất + log khi chạy Docker (không đưa lên git)
-system/                 ← Mã nguồn, Dockerfile, requirements*.txt, .streamlit/, tests/
+docs/                   ← Tài liệu: SKILL.md (quy chuẩn PDF), api.md (hợp đồng API)
+data/                   ← PDF đã xuất + log khi chạy (không đưa lên git)
+web/                    ← Frontend React + Vite + Tailwind CSS (JavaScript/JSX)
+system/                 ← Backend Starlette API, core, services, infra, tests
 ```
 
-Trong `system/`, mã chia **4 lớp**, mỗi lớp một thư mục; lớp trên gọi lớp dưới, **không gọi ngược**:
+Mã nguồn chia làm 2 tầng độc lập:
 
-```
-app.py                  ← Điểm khởi chạy Streamlit
-│
-├── ui/                 ← GIAO DIỆN
-│   ├── components.py       HTML + CSS các thành phần
-│   ├── styles.css          CSS giao diện
-│   ├── profile_form.py     Form sửa hồ sơ (mỗi loại mục một hàm)
-│   ├── preview.py          Xem trước PDF và CV gốc
-│   └── table_text.py       Đổi bảng ↔ chữ cho ô dạng bảng
-│
-├── core/               ← NGHIỆP VỤ
-│   ├── pipeline.py         Đọc CV → dựng PDF → lưu bản sao → tóm tắt
-│   └── pdf_status.py       Luật khoá/mở nút Tải PDF
-│
-├── services/           ← XỬ LÝ CHUYÊN MÔN
-│   ├── extraction/         Bộ trích xuất CV
-│   │   ├── base.py             Interface + chọn bộ trích xuất
-│   │   ├── manual.py           Bộ "nhập tay" (khung hồ sơ trống)
-│   │   └── rules/              Bộ đọc PDF theo luật (mỗi giai đoạn 1 module)
-│   ├── ai/
-│   │   └── models.py           Cấu trúc hồ sơ Pydantic (tên thư mục giữ từ thời dùng AI)
-│   ├── pdf/
-│   │   ├── render.py           Dựng HTML → PDF, chọn cỡ chữ, cắt ảnh chân dung
-│   │   ├── render_worker.py    Chạy Chromium xuất PDF trong tiến trình riêng
-│   │   ├── pdf_utils.py        Đo bố cục PDF (số trang, độ đầy trang cuối)
-│   │   ├── template.html       Mẫu Jinja của PDF
-│   │   └── template.css        CSS tĩnh của PDF
-│   └── privacy/
-│       └── checks.py           Quét thông tin nhạy cảm + checklist PDF
-│
-├── infra/              ← HẠ TẦNG
-│   ├── settings.py         Cấu hình chung (mặc định + biến môi trường)
-│   ├── tokens.py           Design tokens (màu, cỡ chữ, khoảng cách)
-│   ├── logging_setup.py    Cấu hình log + run_id + che tên file
-│   └── storage.py          Tự xoá PDF/JSON hết hạn, tên bản sao không ghi đè
-│
-└── config/ prompts/ assets/ tests/
-```
+1. **Frontend (`web/`)**:
+   - `src/api/client.js`: Module duy nhất gọi API backend
+   - `src/components/`: Header, ChatPanel, OriginalCvPreview, PdfPanel, StatusBar, StageScreen
+   - `src/components/profile/`: ProfileForm và các Editor từng mục (ReviewBadge, GeneralInfo, Portrait, Stats, Sections)
+   - `src/tokens.css`: Biến CSS sinh tự động từ `system/infra/tokens.py`
 
-> **Quy ước:** Định danh trong code (hàm, biến, lớp, key) đặt **tiếng Anh** theo PEP 8; chữ hiển thị cho người dùng, nội dung PDF và chú thích giữ **tiếng Việt**. Các thư mục là *namespace package* (không có `__init__.py`) — luôn chạy lệnh Python từ thư mục **`system/`**.
-
-### Vì sao xuất PDF bằng tiến trình riêng?
-
-Streamlit và Playwright đều cần "event loop" riêng; chạy chung dễ treo. Tách Playwright ra một chương trình nhỏ (`services/pdf/render_worker.py`) chạy độc lập là cách ổn định nhất.
+2. **Backend (`system/`)**:
+   - `api/`: Lớp API mỏng Starlette (`server.py`, `routes.py`, `state.py`), stream tiến độ SSE
+   - `core/`: Luồng nghiệp vụ (`pipeline.py`, `pdf_status.py`)
+   - `services/`: Trích xuất PDF (`extraction/rules/`), render PDF Playwright (`pdf/`), quét PII (`privacy/`)
+   - `infra/`: Thiết lập (`settings.py`, `tokens.py`, `logging_setup.py`, `storage.py`)
+   - `tests/`: Bộ kiểm thử backend (`test_api_contract.py`, `test_smoke_e2e.py`, ...)
 
 ---
 
 ## 🧪 Chạy test
 
+### Backend (Python)
+
 ```powershell
-# Toàn bộ (~260 test, có dựng PDF bằng Chromium thật)
-python -m pytest -q
+cd system
+
+# Toàn bộ test nhanh
+python -m pytest -q -m "not slow"
+
+# Kiểm tra hợp đồng API
+python -m pytest -q tests/test_api_contract.py
+
+# Smoke test E2E với Playwright Chromium thật
+python -m pytest -q tests/test_smoke_e2e.py
+```
+
+### Frontend (React & Vite)
+
+```powershell
+cd web
+
+# Kiểm tra ESLint
+npm run lint
+
+# Chạy unit & component test bằng Vitest
+npm run test
+```
 
 # Bỏ các test chạy Chromium, nhanh hơn
 python -m pytest -q -m "not slow"
@@ -283,7 +308,7 @@ Chính sách xử lý dữ liệu cá nhân: xem [`docs/data-privacy-policy.md`]
 
 ```powershell
 $env:RENDER_MAX_CONCURRENT = "1"
-python -m streamlit run app.py
+python -m api.server
 ```
 
 ---
@@ -293,6 +318,7 @@ python -m streamlit run app.py
 | Tài liệu | Mô tả |
 |---|---|
 | [`docs/SKILL.md`](docs/SKILL.md) | Quy chuẩn hồ sơ PDF (bố cục, thông tin bỏ/giữ, đặt tên file, checklist) |
+| [`docs/api.md`](docs/api.md) | Hợp đồng API chi tiết giữa backend Starlette và frontend React |
 | [`docs/design-system.md`](docs/design-system.md) | Hệ thống giao diện: design tokens, nguyên tắc màu sắc, cách đổi token |
 | [`docs/data-privacy-policy.md`](docs/data-privacy-policy.md) | Chính sách xử lý dữ liệu cá nhân ứng viên (bản nháp, chờ pháp chế) |
 | [`docs/proposals.md`](docs/proposals.md) | Đề xuất dài hạn: đăng nhập/phân quyền, CI, cải tiến khác |
@@ -303,10 +329,11 @@ python -m streamlit run app.py
 
 | Thành phần | Công nghệ |
 |---|---|
-| Web framework | [Streamlit](https://streamlit.io/) |
+| Backend API | [Starlette](https://www.starlette.io/) + [Uvicorn](https://www.uvicorn.org/) |
+| Frontend | [React 19](https://react.dev/) + [Vite](https://vitejs.dev/) + [Tailwind CSS v4](https://tailwindcss.com/) |
+| Kiểm thử frontend | [Vitest](https://vitest.dev/) + [React Testing Library](https://testing-library.com/) |
 | Đọc PDF | [PyMuPDF](https://pymupdf.readthedocs.io/) |
 | Cấu trúc dữ liệu | [Pydantic](https://docs.pydantic.dev/) |
 | Template PDF | [Jinja2](https://jinja.palletsprojects.com/) |
 | Xuất PDF | [Playwright](https://playwright.dev/python/) (Chromium) |
 | Xử lý ảnh | [Pillow](https://pillow.readthedocs.io/) + [OpenCV](https://opencv.org/) |
-| Giao diện | HTML/CSS + Streamlit components |
