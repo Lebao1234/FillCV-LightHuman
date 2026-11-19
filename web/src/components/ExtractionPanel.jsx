@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { SUPPORTED_LANGUAGES } from '../i18n/config.jsx'
+import { SUPPORTED_LANGUAGES } from '@/i18n/config.jsx'
 
 const ICON_FILE = (
   <svg
