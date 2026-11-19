@@ -15,7 +15,8 @@ import tomllib
 from functools import lru_cache
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent   # gốc dự án (file này nằm trong infra/)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent   # gốc mã nguồn backend (system/)
+REPO_ROOT = PROJECT_ROOT.parent if (PROJECT_ROOT.parent / "system").exists() else PROJECT_ROOT
 
 
 # Đọc đường dẫn từ biến môi trường
@@ -25,7 +26,7 @@ def _env_path(name: str, default: Path) -> Path:
     if not value:
         return default
     p = Path(value)
-    return p if p.is_absolute() else PROJECT_ROOT / p
+    return p if p.is_absolute() else REPO_ROOT / p
 
 
 # Đọc số nguyên dương từ biến môi trường
@@ -55,8 +56,8 @@ def uploader_types(exts: tuple[str, ...]) -> list[str]:
 # ---------------------------------------------------------------------------
 # Thư mục lưu PDF đã xuất
 def output_dir() -> Path:
-    """Nơi lưu bản sao PDF đã xuất. Biến môi trường OUTPUT_DIR; mặc định data/output."""
-    return _env_path("OUTPUT_DIR", PROJECT_ROOT / "data" / "output")
+    """Nơi lưu bản sao PDF đã xuất. Biến môi trường OUTPUT_DIR; mặc định data/output ở gốc dự án."""
+    return _env_path("OUTPUT_DIR", REPO_ROOT / "data" / "output")
 
 
 # Logo dùng trong PDF

@@ -17,7 +17,9 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-DEFAULT_LOG_DIR = Path(__file__).resolve().parent.parent / "data" / "logs"   # gốc dự án / data / logs
+_ROOT = Path(__file__).resolve().parent.parent
+_REPO_ROOT = _ROOT.parent if (_ROOT.parent / "system").exists() else _ROOT
+DEFAULT_LOG_DIR = _REPO_ROOT / "data" / "logs"   # gốc dự án / data / logs
 LOG_FILE_MAX_BYTES = 1_000_000   # ~1 MB mỗi file
 LOG_BACKUP_COUNT = 5                # giữ app.log.1 … app.log.5
 LOG_FORMAT = "%(asctime)s %(levelname)-7s [%(run_id)s] %(name)s: %(message)s"
