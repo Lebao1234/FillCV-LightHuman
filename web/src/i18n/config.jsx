@@ -7,8 +7,8 @@
 
 // Danh sách ngôn ngữ được hỗ trợ
 export const SUPPORTED_LANGUAGES = [
-  { code: 'vi', label: 'Tiếng Việt', flag: '🇻🇳', fileSuffix: '' },
-  { code: 'en', label: 'English', flag: '🇬🇧', fileSuffix: ' - EN' },
+  { code: 'vi', label: 'Tiếng Việt', fileSuffix: '' },
+  { code: 'en', label: 'English', fileSuffix: ' - EN' },
 ]
 
 // Ngôn ngữ mặc định

@@ -14,6 +14,13 @@ import {
 } from './api/client.js'
 
 // Ứng dụng chính FillCV Light Human
+// Các tab của khung bên phải
+const TABS = [
+  { id: 'pdf', label: 'Bản PDF' },
+  { id: 'edit', label: 'Chỉnh sửa nội dung' },
+  { id: 'original', label: 'CV gốc' },
+]
+
 export default function App() {
   const [config, setConfig] = useState(null)
 
@@ -233,15 +240,29 @@ export default function App() {
     setActiveTab('pdf')
   }
 
+  // Đổi tab bằng phím mũi tên trái/phải, Home/End (WAI-ARIA tabs)
+  const handleTabKeyDown = (e) => {
+    const idx = TABS.findIndex((t) => t.id === activeTab)
+    let next
+    if (e.key === 'ArrowRight') next = (idx + 1) % TABS.length
+    else if (e.key === 'ArrowLeft') next = (idx - 1 + TABS.length) % TABS.length
+    else if (e.key === 'Home') next = 0
+    else if (e.key === 'End') next = TABS.length - 1
+    else return
+    e.preventDefault()
+    setActiveTab(TABS[next].id)
+    document.getElementById(`tab-${TABS[next].id}`)?.focus()
+  }
+
   const isBusy = isExtracting || isBuildingPdf
 
   return (
-    <div className="block-container">
+    <div className="block-container mx-auto max-w-[1480px] p-4 sm:px-4 sm:pt-4 sm:pb-6 lg:px-8 lg:pt-6 lg:pb-8">
       <Header logoB64={config?.logo_header_b64} />
 
-      <main className="app-grid">
+      <main className="app-grid grid grid-cols-1 lg:grid-cols-[5fr_7fr] gap-6 lg:gap-8 items-start">
         {/* Cột trái: Trạng thái bóc tách CV (Stateful Pipeline & Dashboard) */}
-        <section className="col-left">
+        <section className="col-left min-w-0 flex flex-col">
           <ExtractionPanel
             isExtracting={isExtracting}
             isBuildingPdf={isBuildingPdf}
@@ -266,9 +287,11 @@ export default function App() {
         </section>
 
         {/* Cột phải: Hồ sơ PDF & Các tab chức năng */}
-        <section className="col-right">
-          <div className="lh-ph">
-            <div className="h">Hồ sơ PDF</div>
+        <section className="col-right min-w-0 flex flex-col">
+          <div className="lh-ph flex items-center justify-between h-10 mb-3">
+            <div className="h text-md font-semibold text-ink uppercase tracking-[0.06em] flex items-center gap-2 after:content-[''] after:w-3.5 after:h-0.5 after:bg-gold">
+              Hồ sơ PDF
+            </div>
           </div>
 
           {isBusy ? (
@@ -283,67 +306,72 @@ export default function App() {
             <StageScreen busy={false} />
           ) : (
             <div>
-              {/* Thanh chọn Tab */}
-              <div className="tabs-header">
-                <button
-                  type="button"
-                  className={`tab-btn ${activeTab === 'pdf' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('pdf')}
-                >
-                  Bản PDF
-                </button>
-                <button
-                  type="button"
-                  className={`tab-btn ${activeTab === 'edit' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('edit')}
-                >
-                  Chỉnh sửa nội dung
-                </button>
-                <button
-                  type="button"
-                  className={`tab-btn ${activeTab === 'original' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('original')}
-                >
-                  CV gốc
-                </button>
+              {/* Thanh chọn Tab: theo mẫu WAI-ARIA tabs, đổi tab bằng phím mũi tên */}
+              <div
+                className="tabs-header flex border-b border-line mb-4"
+                role="tablist"
+                aria-label="Các chế độ xem hồ sơ"
+                onKeyDown={handleTabKeyDown}
+              >
+                {TABS.map((t) => (
+                  <button
+                    key={t.id}
+                    id={`tab-${t.id}`}
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === t.id}
+                    aria-controls="tab-panel"
+                    tabIndex={activeTab === t.id ? 0 : -1}
+                    className={`tab-btn px-4 py-2 bg-transparent border-b-2 text-md font-medium cursor-pointer transition-colors duration-200 outline-none focus-visible:outline-2 focus-visible:outline-navy ${
+                      activeTab === t.id
+                        ? 'active text-navy border-navy font-semibold'
+                        : 'text-muted border-transparent hover:text-ink'
+                    }`}
+                    onClick={() => setActiveTab(t.id)}
+                  >
+                    {t.label}
+                  </button>
+                ))}
               </div>
 
               {/* Nội dung Tab */}
-              {activeTab === 'pdf' && (
-                <PdfPanel
-                  pdfData={pdfData}
-                  structureErrors={structureErrors}
-                  violations={violations}
-                  status={pdfStatus}
-                  isBuilding={isBuildingPdf}
-                  onUpdatePdf={() => handleBuildPdf(cvData, runId, project, position, pdfLang)}
-                  checkedGenerated={checkedGenerated}
-                  setCheckedGenerated={setCheckedGenerated}
-                  reviewed={reviewed}
-                  setReviewed={setReviewed}
-                  pdfLang={pdfLang}
-                  onChangeLang={handleChangeLang}
-                />
-              )}
+              <div id="tab-panel" role="tabpanel" aria-labelledby={`tab-${activeTab}`}>
+                {activeTab === 'pdf' && (
+                  <PdfPanel
+                    pdfData={pdfData}
+                    structureErrors={structureErrors}
+                    violations={violations}
+                    status={pdfStatus}
+                    isBuilding={isBuildingPdf}
+                    onUpdatePdf={() => handleBuildPdf(cvData, runId, project, position, pdfLang)}
+                    checkedGenerated={checkedGenerated}
+                    setCheckedGenerated={setCheckedGenerated}
+                    reviewed={reviewed}
+                    setReviewed={setReviewed}
+                    pdfLang={pdfLang}
+                    onChangeLang={handleChangeLang}
+                  />
+                )}
 
-              {activeTab === 'edit' && (
-                <ProfileForm
-                  cv={cvData}
-                  onChangeCv={handleCvChange}
-                  project={project}
-                  onChangeProject={setProject}
-                  position={position}
-                  onChangePosition={setPosition}
-                  runId={runId}
-                  photoUrl={photoUrl}
-                  onChangePhoto={setPhotoUrl}
-                  review={review}
-                />
-              )}
+                {activeTab === 'edit' && (
+                  <ProfileForm
+                    cv={cvData}
+                    onChangeCv={handleCvChange}
+                    project={project}
+                    onChangeProject={setProject}
+                    position={position}
+                    onChangePosition={setPosition}
+                    runId={runId}
+                    photoUrl={photoUrl}
+                    onChangePhoto={setPhotoUrl}
+                    review={review}
+                  />
+                )}
 
-              {activeTab === 'original' && (
-                <OriginalCvPreview runId={runId} originalName={originalName} />
-              )}
+                {activeTab === 'original' && (
+                  <OriginalCvPreview runId={runId} originalName={originalName} />
+                )}
+              </div>
             </div>
           )}
         </section>

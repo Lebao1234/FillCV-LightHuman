@@ -8,7 +8,20 @@ Tài liệu cho người sửa giao diện web app (`web/`) và mẫu hồ sơ P
 2. **Mẫu PDF theo đúng SKILL.md.** Token PDF (`css_vars("pdf")`) giữ nguyên giá trị mục 5 SKILL.md. Sửa token mà làm đổi PDF tức là đổi chuẩn hồ sơ, cần chị Trâm duyệt.
 3. **Navy là màu nhấn duy nhất, gold chỉ để trang trí.** Gold sáng (`--gold`) dùng cho vạch, chấm đầu dòng. Khi cần chữ màu vàng, dùng `--gold-text`.
 4. **Chữ trên nền phải đạt WCAG AA (≥ 4.5:1).** Mọi cặp chữ/nền đang dùng được liệt kê trong `tokens.TEXT_BG_PAIRS` và được test kiểm tra.
-5. **Không emoji.** Icon dùng SVG nét 1.5px.
+5. **Không emoji.** Icon dùng SVG nét 1.5px (cờ quốc gia, ▲▼, ⚠ đều thay bằng SVG hoặc chữ).
+6. **Một họ font duy nhất: Be Vietnam Pro** (tự host bằng `@fontsource`, có subset tiếng Việt, không gọi Google Fonts). Không dùng font mono; `pre`/`code` kế thừa họ font này. PDF dùng font serif riêng theo SKILL.md.
+7. **Tailwind CSS v4 là lớp utility chính.** `web/src/index.css` ánh xạ token sang `@theme` (màu `bg-navy`, `text-muted`, cỡ chữ `text-sm`, bo góc `rounded-md`...). Không viết `style={{…}}` trong JSX và không viết mã màu/rgba trong CSS: test `web/src/test/styles.test.js` kiểm tra. CSS thành phần cũ (`styles.css`) nằm ở layer `components`, nên utility luôn ghi đè được.
+
+### Tailwind và khoảng cách
+
+1 đơn vị Tailwind = 4px: `p-1`=`--sp-1`, `p-2`=`--sp-2`, `p-3`=`--sp-3`, `p-4`=`--sp-4`, `p-6`=`--sp-5` (24px), `p-8`=`--sp-6` (32px), `p-10`=`--sp-7` (40px).
+
+### Trợ năng (accessibility) bắt buộc cho thành phần mới
+
+- Mọi ô nhập dùng `<Field label="…">` (`components/Field.jsx`): tự gắn nhãn với ô bằng `useId`.
+- Nút chỉ có icon phải có `aria-label`. Vùng đổi nội dung động dùng `role="status"`/`aria-live="polite"`, lỗi dùng `role="alert"`.
+- Tab theo mẫu WAI-ARIA (`role=tablist/tab/tabpanel`, phím mũi tên).
+- Vòng focus dùng chung (`:focus-visible`, viền navy 2px) và khối `prefers-reduced-motion` nằm ở cuối `styles.css`.
 
 ## Cách đổi một token
 
@@ -38,6 +51,8 @@ Phần này được sinh từ `python -m infra.tokens`, không sửa tay.
 | `--soft` | `#f5f6f8` |
 | `--skeleton` | `#edf0f4` |
 | `--skeleton-hi` | `#f8f9fb` |
+| `--surface-hi` | `#fafbfd` |
+| `--surface-warm` | `#fffdf9` |
 | `--line` | `#d9dce3` |
 | `--line-strong` | `#cdd2dc` |
 | `--ok` | `#2f7a57` |
@@ -119,7 +134,7 @@ Chấm tròn (`border-radius:50%`) và các kích thước cố định (logo ca
 
 ## Thành phần
 
-Các thành phần dưới đây là HTML do `app.py` tạo ra, dùng chung tiền tố `lh-`. Hàm tạo nằm trong `app.py`, ghi ở mục "Mã".
+Các thành phần dưới đây là component React ở `web/src/components/`, CSS ở `web/src/styles.css`. Một số dùng tiền tố `lh-`; thành phần mới ưu tiên utility Tailwind.
 
 ### Nhãn trạng thái (`lh-pill`)
 
@@ -155,7 +170,7 @@ Thông báo ngay trong khung PDF: lỗi cần sửa, nhắc cập nhật.
 | `items` | list[str] \| None | Chi tiết, mỗi dòng một ý. Dùng `<code>` cho giá trị bị bắt |
 
 - **Truy cập:** tiêu đề in đậm, đọc được ngay. Màu chỉ là tín hiệu phụ, viền trái 3px giúp phân biệt cả khi in đen trắng.
-- **Nên:** escape mọi dữ liệu từ CV (`E(...)`). **Không nên:** dùng `st.error` của Streamlit trong khung PDF, vì sẽ lệch phong cách.
+- **Nên:** escape mọi dữ liệu từ CV (`E(...)`). **Không nên:** tự tạo hộp thông báo mới, dùng `lh-alert`.
 
 ### Bong bóng chat (`lh-msg`)
 
@@ -169,14 +184,14 @@ Thông báo ngay trong khung PDF: lỗi cần sửa, nhắc cập nhật.
 - **Cấu trúc:** `.who` là nhãn người gửi (chữ hoa `--fs-xs`), `.bub` là nội dung. Kết quả đọc CV chia thành các `.lh-sec` (nhãn + số lượng + danh sách).
 - **Trạng thái:** đang xử lý dùng `.lh-typing` (ba chấm nhấp nháy).
 - **Chuyển động:** hiện dần và dịch lên 6px (`lhIn`, `--dur-base`).
-- **Mã:** `render_message(m)` trong `ui/components.py`. Tin lưu trong `st.session_state.chat` dạng `{role, kind, ...}`.
+- **Mã:** `ExtractionPanel.jsx` (thẻ kết quả, pipeline, hàng đợi) và `StageScreen.jsx`.
 
 ### Thanh trạng thái PDF (`lh-bar`)
 
 Một dòng trên cùng tab Bản PDF: icon tài liệu, tên file (mono), "A4 · n trang", và nhãn trạng thái.
 
 - **Trạng thái:** nhãn bên phải theo bảng của `lh-pill`. Tên file dài bị cắt bằng dấu "…".
-- **Mã:** điền vào `bar_slot` sau khi đã biết trạng thái duyệt, để thanh luôn nằm trên cùng.
+- **Mã:** `StatusBar.jsx`.
 
 ### Dòng checklist (`lh-check`)
 
@@ -192,23 +207,23 @@ Trạng thái trống và trạng thái đang xử lý của khung PDF.
 | `stage(True, step)` | Đang đọc CV / dựng PDF | Vệt sáng chạy qua các vạch (`lhShim`); bước `step` đang làm (chữ đậm, số `--gold-text`), các bước trước bị gạch |
 
 - **Truy cập:** vệt sáng tự tắt khi bật giảm chuyển động; tiến độ vẫn đọc được qua chữ của từng bước.
-- **Không nên:** dùng vòng xoay (`st.spinner`) trong khung PDF.
+- **Không nên:** dùng vòng xoay trong khung PDF.
 
 ### Header (`lh-top`) và tiêu đề panel (`lh-ph`)
 
 - **Header:** logo (cao 46px, cắt bằng `render.crop_logo`), vạch ngăn, tên công cụ (`--fs-lg`) và mô tả (`--fs-sm`, `--faint`). Màn hình hẹp (< 900px) thì ẩn vạch ngăn.
 - **Tiêu đề panel:** chữ hoa `--fs-md`, theo sau là vạch gold 14×2px. Cao cố định 40px để hai cột thẳng hàng với nút "Làm mới".
 
-### Nút (Streamlit)
+### Nút (`.btn`)
 
 | Biến thể | Dùng khi |
 |---|---|
-| `type="primary"` (nền navy) | Một hành động chính tại một thời điểm: Gửi CV, Cập nhật PDF (khi cần), Tải PDF (khi sẵn sàng) |
-| `type="secondary"` | Hành động phụ hoặc chưa sẵn sàng |
-| `type="tertiary"` | Hành động nhẹ trên tiêu đề: Làm mới |
+| `btn-primary` (nền navy) | Một hành động chính tại một thời điểm: Gửi CV, Cập nhật PDF (khi cần), Tải PDF (khi sẵn sàng) |
+| `btn-secondary` | Hành động phụ hoặc chưa sẵn sàng |
+| `btn-tertiary` | Hành động nhẹ trên tiêu đề: Làm mới |
 
-- **Trạng thái:** hover và focus theo Streamlit; khi bấm thu nhỏ còn 98% (`--dur-fast`). Khi bị khoá (disabled) luôn có `help=` giải thích vì sao.
-- **Icon:** Material Symbols (`:material/refresh:`, `:material/download:`…), không dùng emoji.
+- **Trạng thái:** hover và vòng focus dùng chung; khi bấm thu nhỏ còn 98% (`--dur-fast`). Khi bị khoá (disabled) phải hiện lý do ngay trên màn hình (không chỉ `title`), nối với nút bằng `aria-describedby`.
+- **Icon:** SVG nét 1.5px nội tuyến, không dùng emoji hay font icon.
 
 ### Thành phần PDF
 

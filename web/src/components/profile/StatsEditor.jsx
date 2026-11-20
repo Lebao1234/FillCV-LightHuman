@@ -1,5 +1,6 @@
 import ReviewBadge from './ReviewBadge.jsx'
 
+import Field from '../Field.jsx'
 const MAX_STATS = 4
 const STAT_LABEL_MAX_LEN = 35
 
@@ -23,77 +24,57 @@ export default function StatsEditor({ cv, onChange, review }) {
   }
 
   return (
-    <div style={{ marginBottom: 'var(--sp-5)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--sp-2)' }}>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <h4 style={{ margin: 0 }}>Hàng ô số liệu (tối đa 4)</h4>
+    <div className="mb-6">
+      <div className="flex justify-between items-center mb-2">
+        <div className="flex items-center">
+          <h4 className="m-0">Hàng ô số liệu (tối đa 4)</h4>
           <ReviewBadge review={review} paths="stats" />
         </div>
         {stats.length < MAX_STATS && (
-          <button type="button" className="btn btn-tertiary" onClick={addStat} style={{ fontSize: 'var(--fs-xs)' }}>
+          <button type="button" className="btn btn-tertiary text-xs" onClick={addStat}>
             + Thêm ô số liệu
           </button>
         )}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--sp-3)' }}>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
         {stats.map((s, idx) => {
           const isTooLong = (s.label || '').length > STAT_LABEL_MAX_LEN
           return (
             <div
               key={idx}
-              style={{
-                border: '1px solid var(--line)',
-                borderRadius: 'var(--r-md)',
-                padding: 'var(--sp-3)',
-                background: 'var(--soft)',
-                position: 'relative',
-              }}
+              className="relative rounded-md border border-line bg-soft p-3"
             >
               <button
                 type="button"
                 onClick={() => removeStat(idx)}
-                style={{
-                  position: 'absolute',
-                  top: '4px',
-                  right: '6px',
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--faint)',
-                  cursor: 'pointer',
-                  fontSize: 'var(--fs-sm)',
-                }}
+              className="absolute top-1 right-1.5 cursor-pointer border-0 bg-transparent text-faint text-sm hover:text-err"
                 title="Xoá ô"
+                aria-label="Xoá ô"
               >
                 ✕
               </button>
-              <div className="form-group" style={{ marginBottom: 'var(--sp-2)' }}>
-                <label className="form-label" style={{ fontSize: 'var(--fs-xs)' }}>
-                  Số liệu (vd: 10+)
-                </label>
+              <Field label="Số liệu (vd: 10+)" small className="mb-2">
                 <input
                   type="text"
                   className="form-input"
                   value={s.value || ''}
                   onChange={(e) => handleStatChange(idx, 'value', e.target.value)}
                 />
-              </div>
-              <div className="form-group">
-                <label className="form-label" style={{ fontSize: 'var(--fs-xs)' }}>
-                  Chú thích
-                </label>
+              </Field>
+              <Field label="Chú thích" small>
                 <input
                   type="text"
                   className="form-input"
                   value={s.label || ''}
                   onChange={(e) => handleStatChange(idx, 'label', e.target.value)}
                 />
-                {isTooLong && (
-                  <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--warn)', marginTop: '2px' }}>
-                    Dài hơn {STAT_LABEL_MAX_LEN} ký tự, có thể tràn ô.
-                  </span>
-                )}
-              </div>
+              </Field>
+              {isTooLong && (
+                <span className="mt-0.5 block text-xs text-warn" role="status">
+                  Dài hơn {STAT_LABEL_MAX_LEN} ký tự, có thể tràn ô.
+                </span>
+              )}
             </div>
           )
         })}

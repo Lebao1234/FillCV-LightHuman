@@ -42,18 +42,18 @@ export default function PortraitEditor({ runId, photoUrl, onPhotoChange }) {
   }
 
   return (
-    <div style={{ marginBottom: 'var(--sp-4)', padding: 'var(--sp-3)', background: 'var(--soft)', borderRadius: 'var(--r-md)' }}>
-      <h4 style={{ margin: '0 0 var(--sp-2)' }}>Ảnh chân dung</h4>
-      {errorMsg && <div className="lh-alert err" style={{ margin: 'var(--sp-2) 0' }}>{errorMsg}</div>}
-      <div style={{ display: 'flex', gap: 'var(--sp-4)', alignItems: 'center' }}>
-        <div style={{ width: '96px', height: '126px', border: '1px solid var(--line)', borderRadius: 'var(--r-sm)', background: 'var(--white)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+    <div className="mb-4 p-3 bg-soft rounded-md">
+      <h4 className="mt-0 mx-0 mb-2">Ảnh chân dung</h4>
+      {errorMsg && <div className="lh-alert err my-2 mx-0">{errorMsg}</div>}
+      <div className="flex gap-4 items-center">
+        <div className="w-[96px] h-[126px] border border-line rounded-sm bg-white flex items-center justify-center overflow-hidden">
           {photoUrl ? (
-            <img src={photoUrl} alt="Chân dung" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <img src={photoUrl} alt="Chân dung" className="w-full h-[100%] object-cover" />
           ) : (
-            <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--faint)' }}>Không có ảnh</span>
+            <span className="text-xs text-faint">Không có ảnh</span>
           )}
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)' }}>
+        <div className="flex flex-col gap-2">
           <button
             type="button"
             className="btn btn-secondary"
@@ -65,17 +65,15 @@ export default function PortraitEditor({ runId, photoUrl, onPhotoChange }) {
           <input
             type="file"
             ref={fileInputRef}
-            onChange={handleUpload}
-            style={{ display: 'none' }}
+            onChange={handleUpload} className="hidden"
             accept=".png,.jpg,.jpeg"
           />
           {photoUrl && (
             <button
               type="button"
-              className="btn btn-tertiary"
+              className="btn btn-tertiary self-start"
               onClick={handleDelete}
               disabled={loading}
-              style={{ alignSelf: 'flex-start' }}
             >
               Bỏ ảnh
             </button>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import StatusBar from './StatusBar.jsx'
 import { getDownloadUrl, getPdfPageUrl } from '../api/client.js'
 
@@ -18,6 +18,8 @@ export default function PdfPanel({
   onChangeLang,
 }) {
   const [showChecklist, setShowChecklist] = useState(false)
+  const checklistId = useId()
+  const downloadHintId = useId()
 
   const hasPdf = Boolean(pdfData?.pdf_bytes_ready || pdfData?.filename)
   const filename = pdfData?.filename || 'Chưa có bản PDF'
@@ -112,7 +114,7 @@ export default function PdfPanel({
       {/* Hàng hành động */}
       <div className="action-row">
         <div className="lang-options">
-          <span style={{ fontWeight: 500, color: 'var(--muted)' }}>Ngôn ngữ:</span>
+          <span className="font-medium text-muted">Ngôn ngữ:</span>
           <label>
             <input
               type="radio"
@@ -149,32 +151,40 @@ export default function PdfPanel({
           className={`btn ${status?.can_download ? 'btn-primary' : 'btn-secondary'}`}
           onClick={handleDownload}
           disabled={!status?.can_download || isBuilding}
-          title={
-            status?.can_download
-              ? 'Tải file PDF về máy'
-              : 'Cần tick 2 ô xác nhận, PDF mới nhất và không còn thông tin nhạy cảm'
-          }
+          aria-describedby={status?.can_download ? undefined : downloadHintId}
         >
           Tải PDF
         </button>
       </div>
 
+      {hasPdf && !status?.can_download && !isBuilding && (
+        <p id={downloadHintId} className="mb-3 text-sm text-muted">
+          Chưa tải được PDF: cần tick 2 ô xác nhận, PDF phải là bản mới nhất và không còn thông tin nhạy cảm.
+        </p>
+      )}
+
       {/* Checklist chất lượng */}
       {hasPdf && checklist.length > 0 && (
-        <div style={{ marginBottom: 'var(--sp-4)' }}>
+        <div className="mb-4">
           <button
             type="button"
-            className="btn btn-secondary btn-block"
+            className="btn btn-secondary btn-block justify-between text-sm"
             onClick={() => setShowChecklist(!showChecklist)}
-            style={{ justifyContent: 'space-between', fontSize: 'var(--fs-sm)' }}
+            aria-expanded={showChecklist}
+            aria-controls={checklistId}
           >
             <span>
               Checklist chất lượng · {okCount}/{checklist.length} đạt
             </span>
-            <span>{showChecklist ? '▲ Thu gọn' : '▼ Chi tiết'}</span>
+            <span className="inline-flex items-center gap-1">
+              {showChecklist ? 'Thu gọn' : 'Chi tiết'}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={showChecklist ? 'rotate-180' : ''}>
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </span>
           </button>
           {showChecklist && (
-            <div style={{ border: '1px solid var(--line)', borderTop: 'none', padding: 'var(--sp-3)', background: 'var(--white)' }}>
+            <div id={checklistId} className="border border-line border-t-0 p-3 bg-white">
               {checklist.map((r, i) => (
                 <div key={i} className={`lh-check ${r.ok ? '' : 'no'}`}>
                   <span className="m" />

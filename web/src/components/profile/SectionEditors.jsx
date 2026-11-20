@@ -1,3 +1,5 @@
+import Field from '../Field.jsx'
+
 // Các component chỉnh sửa tương ứng từng loại mục (EDITORS_BY_TYPE)
 
 // 1. Mục dạng đoạn văn (text)
@@ -8,10 +10,7 @@ export function TextSection({ section, onChange }) {
     onChange({ ...section, paragraphs: lines })
   }
   return (
-    <div className="form-group">
-      <label className="form-label" style={{ fontSize: 'var(--fs-xs)' }}>
-        Đoạn văn (mỗi dòng 1 đoạn)
-      </label>
+    <Field label="Đoạn văn (mỗi dòng 1 đoạn)" small>
       <textarea
         className="form-textarea"
         rows={5}
@@ -19,7 +18,7 @@ export function TextSection({ section, onChange }) {
         onChange={handleChange}
         placeholder="Nhập nội dung các đoạn văn..."
       />
-    </div>
+    </Field>
   )
 }
 
@@ -31,10 +30,7 @@ export function BulletsSection({ section, onChange }) {
     onChange({ ...section, bullets: lines })
   }
   return (
-    <div className="form-group">
-      <label className="form-label" style={{ fontSize: 'var(--fs-xs)' }}>
-        Gạch đầu dòng (mỗi dòng 1 ý)
-      </label>
+    <Field label="Gạch đầu dòng (mỗi dòng 1 ý)" small>
       <textarea
         className="form-textarea"
         rows={6}
@@ -42,7 +38,7 @@ export function BulletsSection({ section, onChange }) {
         onChange={handleChange}
         placeholder="Mỗi dòng là một gạch đầu dòng..."
       />
-    </div>
+    </Field>
   )
 }
 
@@ -54,10 +50,7 @@ export function TagsSection({ section, onChange }) {
     onChange({ ...section, tags: lines })
   }
   return (
-    <div className="form-group">
-      <label className="form-label" style={{ fontSize: 'var(--fs-xs)' }}>
-        Thẻ (mỗi dòng 1 thẻ)
-      </label>
+    <Field label="Thẻ (mỗi dòng 1 thẻ)" small>
       <textarea
         className="form-textarea"
         rows={4}
@@ -65,7 +58,7 @@ export function TagsSection({ section, onChange }) {
         onChange={handleChange}
         placeholder="Mỗi dòng là một thẻ kỹ năng/ngôn ngữ..."
       />
-    </div>
+    </Field>
   )
 }
 
@@ -92,61 +85,42 @@ export function CardsSection({ section, onChange }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--sp-2)' }}>
-        <button type="button" className="btn btn-tertiary" onClick={addCard} style={{ fontSize: 'var(--fs-xs)' }}>
+      <div className="flex justify-end mb-2">
+        <button type="button" className="btn btn-tertiary text-xs" onClick={addCard}>
           + Thêm thẻ năng lực
         </button>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--sp-3)' }}>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-3">
         {cards.map((c, idx) => (
           <div
             key={idx}
-            style={{
-              border: '1px solid var(--line)',
-              borderRadius: 'var(--r-md)',
-              padding: 'var(--sp-3)',
-              background: 'var(--white)',
-              position: 'relative',
-            }}
+            className="relative rounded-md border border-line bg-white p-3"
           >
             <button
               type="button"
               onClick={() => removeCard(idx)}
-              style={{
-                position: 'absolute',
-                top: '4px',
-                right: '6px',
-                background: 'none',
-                border: 'none',
-                color: 'var(--faint)',
-                cursor: 'pointer',
-              }}
+              className="absolute top-1 right-1.5 cursor-pointer border-0 bg-transparent text-faint hover:text-err"
               title="Xoá thẻ"
+              aria-label="Xoá thẻ"
             >
               ✕
             </button>
-            <div className="form-group" style={{ marginBottom: 'var(--sp-2)' }}>
-              <label className="form-label" style={{ fontSize: 'var(--fs-xs)' }}>
-                Tên thẻ
-              </label>
+            <Field label="Tên thẻ" small className="mb-2">
               <input
                 type="text"
                 className="form-input"
                 value={c.title || ''}
                 onChange={(e) => updateCard(idx, 'title', e.target.value)}
               />
-            </div>
-            <div className="form-group">
-              <label className="form-label" style={{ fontSize: 'var(--fs-xs)' }}>
-                Nội dung (mỗi dòng 1 ý)
-              </label>
+            </Field>
+            <Field label="Nội dung (mỗi dòng 1 ý)" small>
               <textarea
                 className="form-textarea"
                 rows={4}
                 value={(c.items || []).join('\n')}
                 onChange={(e) => updateCard(idx, 'items', e.target.value.split('\n'))}
               />
-            </div>
+            </Field>
           </div>
         ))}
       </div>
@@ -177,26 +151,20 @@ export function CareerPathSection({ section, onChange }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--sp-2)' }}>
-        <button type="button" className="btn btn-tertiary" onClick={addRow} style={{ fontSize: 'var(--fs-xs)' }}>
+      <div className="flex justify-end mb-2">
+        <button type="button" className="btn btn-tertiary text-xs" onClick={addRow}>
           + Thêm mốc lộ trình
         </button>
       </div>
       {items.map((row, idx) => (
         <div
-          key={idx}
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1.5fr 2fr 2fr auto auto',
-            gap: 'var(--sp-2)',
-            alignItems: 'center',
-            marginBottom: 'var(--sp-2)',
-          }}
+          key={idx} className="grid grid-cols-[1.5fr_2fr_2fr_auto_auto] gap-2 items-center mb-2"
         >
           <input
             type="text"
             className="form-input"
             placeholder="Thời gian"
+            aria-label="Thời gian"
             value={row.period || ''}
             onChange={(e) => updateRow(idx, 'period', e.target.value)}
           />
@@ -204,6 +172,7 @@ export function CareerPathSection({ section, onChange }) {
             type="text"
             className="form-input"
             placeholder="Chức danh"
+            aria-label="Chức danh"
             value={row.title || ''}
             onChange={(e) => updateRow(idx, 'title', e.target.value)}
           />
@@ -211,10 +180,11 @@ export function CareerPathSection({ section, onChange }) {
             type="text"
             className="form-input"
             placeholder="Công ty"
+            aria-label="Công ty"
             value={row.company || ''}
             onChange={(e) => updateRow(idx, 'company', e.target.value)}
           />
-          <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: 'var(--fs-xs)', cursor: 'pointer' }}>
+          <label className="flex items-center gap-1 text-xs cursor-pointer">
             <input
               type="checkbox"
               checked={Boolean(row.current)}
@@ -224,10 +194,10 @@ export function CareerPathSection({ section, onChange }) {
           </label>
           <button
             type="button"
-            className="btn btn-tertiary"
+            className="btn btn-tertiary text-err p-1"
             onClick={() => removeRow(idx)}
-            style={{ color: 'var(--err)', padding: 'var(--sp-1)' }}
             title="Xoá dòng"
+            aria-label="Xoá dòng"
           >
             ✕
           </button>
@@ -260,26 +230,20 @@ export function EducationSection({ section, onChange }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--sp-2)' }}>
-        <button type="button" className="btn btn-tertiary" onClick={addRow} style={{ fontSize: 'var(--fs-xs)' }}>
+      <div className="flex justify-end mb-2">
+        <button type="button" className="btn btn-tertiary text-xs" onClick={addRow}>
           + Thêm học vấn
         </button>
       </div>
       {items.map((row, idx) => (
         <div
-          key={idx}
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '2fr 3fr 1.5fr auto',
-            gap: 'var(--sp-2)',
-            alignItems: 'center',
-            marginBottom: 'var(--sp-2)',
-          }}
+          key={idx} className="grid grid-cols-[2fr_3fr_1.5fr_auto] gap-2 items-center mb-2"
         >
           <input
             type="text"
             className="form-input"
             placeholder="Văn bằng / Chứng chỉ"
+            aria-label="Văn bằng / Chứng chỉ"
             value={row.title || ''}
             onChange={(e) => updateRow(idx, 'title', e.target.value)}
           />
@@ -287,6 +251,7 @@ export function EducationSection({ section, onChange }) {
             type="text"
             className="form-input"
             placeholder="Trường / Nơi cấp"
+            aria-label="Trường / Nơi cấp"
             value={row.detail || ''}
             onChange={(e) => updateRow(idx, 'detail', e.target.value)}
           />
@@ -294,15 +259,16 @@ export function EducationSection({ section, onChange }) {
             type="text"
             className="form-input"
             placeholder="Năm / Thời gian"
+            aria-label="Năm / Thời gian"
             value={row.period || ''}
             onChange={(e) => updateRow(idx, 'period', e.target.value)}
           />
           <button
             type="button"
-            className="btn btn-tertiary"
+            className="btn btn-tertiary text-err p-1"
             onClick={() => removeRow(idx)}
-            style={{ color: 'var(--err)', padding: 'var(--sp-1)' }}
             title="Xoá dòng"
+            aria-label="Xoá dòng"
           >
             ✕
           </button>
@@ -335,26 +301,20 @@ export function ReferencesSection({ section, onChange }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--sp-2)' }}>
-        <button type="button" className="btn btn-tertiary" onClick={addRow} style={{ fontSize: 'var(--fs-xs)' }}>
+      <div className="flex justify-end mb-2">
+        <button type="button" className="btn btn-tertiary text-xs" onClick={addRow}>
           + Thêm người tham chiếu
         </button>
       </div>
       {items.map((row, idx) => (
         <div
-          key={idx}
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '2fr 2fr 2fr auto',
-            gap: 'var(--sp-2)',
-            alignItems: 'center',
-            marginBottom: 'var(--sp-2)',
-          }}
+          key={idx} className="grid grid-cols-[2fr_2fr_2fr_auto] gap-2 items-center mb-2"
         >
           <input
             type="text"
             className="form-input"
             placeholder="Họ tên"
+            aria-label="Họ tên"
             value={row.name || ''}
             onChange={(e) => updateRow(idx, 'name', e.target.value)}
           />
@@ -362,6 +322,7 @@ export function ReferencesSection({ section, onChange }) {
             type="text"
             className="form-input"
             placeholder="Chức danh"
+            aria-label="Chức danh"
             value={row.title || ''}
             onChange={(e) => updateRow(idx, 'title', e.target.value)}
           />
@@ -369,15 +330,16 @@ export function ReferencesSection({ section, onChange }) {
             type="text"
             className="form-input"
             placeholder="Công ty"
+            aria-label="Công ty"
             value={row.company || ''}
             onChange={(e) => updateRow(idx, 'company', e.target.value)}
           />
           <button
             type="button"
-            className="btn btn-tertiary"
+            className="btn btn-tertiary text-err p-1"
             onClick={() => removeRow(idx)}
-            style={{ color: 'var(--err)', padding: 'var(--sp-1)' }}
             title="Xoá dòng"
+            aria-label="Xoá dòng"
           >
             ✕
           </button>
@@ -404,38 +366,37 @@ function MetaEditor({ meta = [], onChange }) {
   }
 
   return (
-    <div style={{ marginTop: 'var(--sp-2)', marginBottom: 'var(--sp-2)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--faint)' }}>
+    <div className="mt-2 mb-2">
+      <div className="flex justify-between items-center">
+        <span className="text-xs text-faint">
           Dòng phụ (nhãn để trống = dòng nghiêng)
         </span>
-        <button type="button" className="btn btn-tertiary" onClick={addMeta} style={{ fontSize: 'var(--fs-xs)', padding: '2px 4px' }}>
+        <button type="button" className="btn btn-tertiary text-xs py-0.5 px-1" onClick={addMeta}>
           + Thêm dòng phụ
         </button>
       </div>
       {meta.map((m, idx) => (
-        <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 2fr auto', gap: 'var(--sp-2)', marginTop: '4px', alignItems: 'center' }}>
+        <div key={idx} className="grid grid-cols-[1fr_2fr_auto] gap-2 mt-1 items-center">
           <input
             type="text"
-            className="form-input"
+            className="form-input text-sm py-1 px-2"
             placeholder="Nhãn (vd: Quy mô)"
+            aria-label="Nhãn (vd: Quy mô)"
             value={m.label || ''}
             onChange={(e) => updateMeta(idx, 'label', e.target.value)}
-            style={{ fontSize: 'var(--fs-sm)', padding: '4px 8px' }}
           />
           <input
             type="text"
-            className="form-input"
+            className="form-input text-sm py-1 px-2"
             placeholder="Nội dung dòng phụ"
+            aria-label="Nội dung dòng phụ"
             value={m.text || ''}
             onChange={(e) => updateMeta(idx, 'text', e.target.value)}
-            style={{ fontSize: 'var(--fs-sm)', padding: '4px 8px' }}
           />
           <button
             type="button"
-            className="btn btn-tertiary"
+            className="btn btn-tertiary text-err py-0.5 px-1.5"
             onClick={() => removeMeta(idx)}
-            style={{ color: 'var(--err)', padding: '2px 6px' }}
           >
             ✕
           </button>
@@ -462,44 +423,43 @@ function GroupsEditor({ groups = [], onChange, bulletLabel = 'Gạch đầu dòn
   }
 
   return (
-    <div style={{ marginTop: 'var(--sp-2)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 500, color: 'var(--muted)' }}>
+    <div className="mt-2">
+      <div className="flex justify-between items-center">
+        <span className="text-xs font-medium text-muted">
           {bulletLabel}
         </span>
-        <button type="button" className="btn btn-tertiary" onClick={addGroup} style={{ fontSize: 'var(--fs-xs)', padding: '2px 4px' }}>
+        <button type="button" className="btn btn-tertiary text-xs py-0.5 px-1" onClick={addGroup}>
           + Thêm nhóm việc
         </button>
       </div>
       {groups.map((g, idx) => (
-        <div key={idx} style={{ borderLeft: '2px solid var(--line)', paddingLeft: 'var(--sp-2)', margin: 'var(--sp-2) 0' }}>
-          <div style={{ display: 'flex', gap: 'var(--sp-2)', marginBottom: '4px', alignItems: 'center' }}>
+        <div key={idx} className="my-2 border-l-2 border-line pl-2">
+          <div className="flex gap-2 mb-1 items-center">
             <input
               type="text"
-              className="form-input"
+              className="form-input text-sm py-1 px-2"
               placeholder="Tiêu đề nhóm việc (không bắt buộc)"
+              aria-label="Tiêu đề nhóm việc (không bắt buộc)"
               value={g.title || ''}
               onChange={(e) => updateGroup(idx, 'title', e.target.value || null)}
-              style={{ fontSize: 'var(--fs-sm)', padding: '4px 8px' }}
             />
             {groups.length > 1 && (
               <button
                 type="button"
-                className="btn btn-tertiary"
+                className="btn btn-tertiary text-err"
                 onClick={() => removeGroup(idx)}
-                style={{ color: 'var(--err)' }}
               >
                 ✕
               </button>
             )}
           </div>
           <textarea
-            className="form-textarea"
+            className="form-textarea text-sm"
             rows={3}
             value={(g.bullets || []).join('\n')}
             onChange={(e) => updateGroup(idx, 'bullets', e.target.value.split('\n'))}
             placeholder="Mỗi dòng là một ý..."
-            style={{ fontSize: 'var(--fs-sm)' }}
+            aria-label="Mỗi dòng là một ý..."
           />
         </div>
       ))}
@@ -549,77 +509,64 @@ export function ExperienceSection({ section, onChange }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--sp-2)' }}>
-        <button type="button" className="btn btn-tertiary" onClick={addJob} style={{ fontSize: 'var(--fs-xs)' }}>
+      <div className="flex justify-end mb-2">
+        <button type="button" className="btn btn-tertiary text-xs" onClick={addJob}>
           + Thêm công việc
         </button>
       </div>
 
       {jobs.map((job, idx) => (
         <div
-          key={idx}
-          style={{
-            border: '1px solid var(--line)',
-            borderRadius: 'var(--r-md)',
-            padding: 'var(--sp-3)',
-            marginBottom: 'var(--sp-4)',
-            background: 'var(--soft)',
-          }}
+          key={idx} className="border border-line rounded-md p-3 mb-4 bg-soft"
         >
           {/* Header công việc */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--sp-2)' }}>
-            <span style={{ fontWeight: 600, fontSize: 'var(--fs-sm)', color: 'var(--ink)' }}>
+          <div className="flex justify-between items-center mb-2">
+            <span className="font-semibold text-sm text-ink">
               Công việc {idx + 1}
             </span>
-            <div style={{ display: 'flex', gap: '4px' }}>
+            <div className="flex gap-1">
               <button
                 type="button"
-                className="btn btn-tertiary"
+                className="btn btn-tertiary py-0.5 px-1.5"
                 onClick={() => moveJob(idx, -1)}
                 disabled={idx === 0}
-                style={{ padding: '2px 6px' }}
                 title="Di chuyển lên"
+                aria-label="Di chuyển lên"
               >
                 ▲
               </button>
               <button
                 type="button"
-                className="btn btn-tertiary"
+                className="btn btn-tertiary py-0.5 px-1.5"
                 onClick={() => moveJob(idx, 1)}
                 disabled={idx === jobs.length - 1}
-                style={{ padding: '2px 6px' }}
                 title="Di chuyển xuống"
+                aria-label="Di chuyển xuống"
               >
                 ▼
               </button>
               <button
                 type="button"
-                className="btn btn-tertiary"
+                className="btn btn-tertiary text-err py-0.5 px-1.5"
                 onClick={() => removeJob(idx)}
-                style={{ color: 'var(--err)', padding: '2px 6px' }}
                 title="Xoá công việc này"
+                aria-label="Xoá công việc này"
               >
                 ✕ Xoá
               </button>
             </div>
           </div>
 
-          <div className="form-row" style={{ marginBottom: 'var(--sp-2)' }}>
-            <div className="form-group">
-              <label className="form-label" style={{ fontSize: 'var(--fs-xs)' }}>
-                Công ty
-              </label>
+          <div className="form-row mb-2">
+            <Field label="Công ty" small>
               <input
                 type="text"
                 className="form-input"
                 value={job.company || ''}
                 onChange={(e) => updateJob(idx, { ...job, company: e.target.value })}
               />
-            </div>
-            <div className="form-group">
-              <label className="form-label" style={{ fontSize: 'var(--fs-xs)' }}>
-                Thời gian
-              </label>
+            </Field>
+            <Field label="Thời gian" small>
               <input
                 type="text"
                 className="form-input"
@@ -627,20 +574,17 @@ export function ExperienceSection({ section, onChange }) {
                 value={job.period || ''}
                 onChange={(e) => updateJob(idx, { ...job, period: e.target.value || null })}
               />
-            </div>
+            </Field>
           </div>
 
-          <div className="form-group" style={{ marginBottom: 'var(--sp-2)' }}>
-            <label className="form-label" style={{ fontSize: 'var(--fs-xs)' }}>
-              Chức danh
-            </label>
+          <Field label="Chức danh" small className="mb-2">
             <input
               type="text"
               className="form-input"
               value={job.role || ''}
               onChange={(e) => updateJob(idx, { ...job, role: e.target.value || null })}
             />
-          </div>
+          </Field>
 
           {/* Dòng phụ (meta) */}
           <MetaEditor
@@ -655,14 +599,14 @@ export function ExperienceSection({ section, onChange }) {
           />
 
           {/* Vị trí con (sub_roles) */}
-          <div style={{ marginTop: 'var(--sp-3)', borderTop: '1px dashed var(--line-strong)', paddingTop: 'var(--sp-2)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--muted)' }}>
+          <div className="mt-3 border-t border-dashed border-line-strong pt-2">
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-semibold text-muted">
                 Vị trí con ({ (job.sub_roles || []).length })
               </span>
               <button
                 type="button"
-                className="btn btn-tertiary"
+                className="btn btn-tertiary text-xs py-0.5 px-1"
                 onClick={() =>
                   updateJob(idx, {
                     ...job,
@@ -672,7 +616,6 @@ export function ExperienceSection({ section, onChange }) {
                     ],
                   })
                 }
-                style={{ fontSize: 'var(--fs-xs)', padding: '2px 4px' }}
               >
                 + Thêm vị trí con
               </button>
@@ -680,25 +623,17 @@ export function ExperienceSection({ section, onChange }) {
 
             {(job.sub_roles || []).map((sub, sIdx) => (
               <div
-                key={sIdx}
-                style={{
-                  border: '1px solid var(--line)',
-                  borderRadius: 'var(--r-sm)',
-                  padding: 'var(--sp-2)',
-                  marginTop: 'var(--sp-2)',
-                  background: 'var(--white)',
-                }}
+                key={sIdx} className="border border-line rounded-sm p-2 mt-2 bg-white"
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                  <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 500 }}>Vị trí con {sIdx + 1}</span>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-xs font-medium">Vị trí con {sIdx + 1}</span>
                   <button
                     type="button"
-                    className="btn btn-tertiary"
+                    className="btn btn-tertiary text-err p-0.5"
                     onClick={() => {
                       const newSubs = job.sub_roles.filter((_, i) => i !== sIdx)
                       updateJob(idx, { ...job, sub_roles: newSubs })
                     }}
-                    style={{ color: 'var(--err)', padding: '2px' }}
                   >
                     ✕
                   </button>
@@ -706,27 +641,27 @@ export function ExperienceSection({ section, onChange }) {
                 <div className="form-row">
                   <input
                     type="text"
-                    className="form-input"
+                    className="form-input text-sm"
                     placeholder="Tên vị trí con"
+                    aria-label="Tên vị trí con"
                     value={sub.name || ''}
                     onChange={(e) => {
                       const newSubs = [...job.sub_roles]
                       newSubs[sIdx] = { ...newSubs[sIdx], name: e.target.value }
                       updateJob(idx, { ...job, sub_roles: newSubs })
                     }}
-                    style={{ fontSize: 'var(--fs-sm)' }}
                   />
                   <input
                     type="text"
-                    className="form-input"
+                    className="form-input text-sm"
                     placeholder="Thời gian vị trí con"
+                    aria-label="Thời gian vị trí con"
                     value={sub.period || ''}
                     onChange={(e) => {
                       const newSubs = [...job.sub_roles]
                       newSubs[sIdx] = { ...newSubs[sIdx], period: e.target.value || null }
                       updateJob(idx, { ...job, sub_roles: newSubs })
                     }}
-                    style={{ fontSize: 'var(--fs-sm)' }}
                   />
                 </div>
                 <MetaEditor

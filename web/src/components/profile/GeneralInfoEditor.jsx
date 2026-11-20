@@ -1,5 +1,6 @@
 import ReviewBadge from './ReviewBadge.jsx'
 
+import Field from '../Field.jsx'
 // Thành phần chỉnh sửa thông tin chung của ứng viên (họ tên, chức danh, năm sinh, giới tính, thông tin nhanh)
 export default function GeneralInfoEditor({ cv, onChange, review }) {
   const updateField = (field, value) => {
@@ -22,89 +23,79 @@ export default function GeneralInfoEditor({ cv, onChange, review }) {
   }
 
   return (
-    <div style={{ marginBottom: 'var(--sp-5)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 'var(--sp-3)' }}>
-        <h4 style={{ margin: 0 }}>Thông tin chung</h4>
+    <div className="mb-6">
+      <div className="flex items-center mb-3">
+        <h4 className="m-0">Thông tin chung</h4>
         <ReviewBadge
           review={review}
           paths={['full_name', 'target_title', 'birth_year', 'gender', 'facts', 'expected_salary']}
         />
       </div>
 
-      <div className="form-row" style={{ marginBottom: 'var(--sp-3)' }}>
-        <div className="form-group">
-          <label className="form-label">
-            Họ và tên <span style={{ color: 'var(--err)' }}>*</span>
-            <ReviewBadge review={review} paths="full_name" />
-          </label>
-          <input
+      <div className="form-row mb-3">
+        <Field label={<>Họ và tên <span className="text-err">*</span>
+            <ReviewBadge review={review} paths="full_name" /></>}>
+<input
             type="text"
             className="form-input"
             value={cv.full_name || ''}
             onChange={(e) => updateField('full_name', e.target.value)}
           />
-        </div>
+        </Field>
 
-        <div className="form-group">
-          <label className="form-label">
-            Chức danh
-            <ReviewBadge review={review} paths="target_title" />
-          </label>
-          <input
+        <Field label={<>Chức danh
+            <ReviewBadge review={review} paths="target_title" /></>}>
+<input
             type="text"
             className="form-input"
             value={cv.target_title || ''}
             onChange={(e) => updateField('target_title', e.target.value)}
           />
-        </div>
+        </Field>
       </div>
 
-      <div className="form-row" style={{ marginBottom: 'var(--sp-3)' }}>
-        <div className="form-group">
-          <label className="form-label">
-            Năm sinh
-            <ReviewBadge review={review} paths="birth_year" />
-          </label>
-          <input
+      <div className="form-row mb-3">
+        <Field label={<>Năm sinh
+            <ReviewBadge review={review} paths="birth_year" /></>}>
+<input
             type="number"
             className="form-input"
             value={cv.birth_year || ''}
             onChange={(e) => updateField('birth_year', e.target.value ? parseInt(e.target.value, 10) : null)}
           />
-        </div>
+        </Field>
 
-        <div className="form-group">
-          <label className="form-label">
-            Giới tính
-            <ReviewBadge review={review} paths="gender" />
-          </label>
-          <input
+        <Field label={<>Giới tính
+            <ReviewBadge review={review} paths="gender" /></>}>
+<input
             type="text"
             className="form-input"
             value={cv.gender || ''}
             onChange={(e) => updateField('gender', e.target.value)}
             placeholder="Nam / Nữ"
+            aria-label="Nam / Nữ"
           />
-        </div>
+        </Field>
       </div>
 
       {/* Thông tin nhanh khác (facts) */}
-      <div style={{ marginTop: 'var(--sp-3)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--sp-2)' }}>
-          <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 500, color: 'var(--muted)' }}>
+      <div className="mt-3">
+        <div className="flex justify-between items-center mb-2">
+          <span className="text-sm font-medium text-muted">
             Thông tin nhanh khác (vd: Mong muốn)
           </span>
-          <button type="button" className="btn btn-tertiary" onClick={addFact} style={{ fontSize: 'var(--fs-xs)' }}>
+          <button type="button" className="btn btn-tertiary text-xs" onClick={addFact}>
             + Thêm dòng
           </button>
         </div>
 
         {(cv.facts || []).map((fact, idx) => (
-          <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 2fr auto', gap: 'var(--sp-2)', marginBottom: 'var(--sp-2)', alignItems: 'center' }}>
+          <div key={idx} className="grid grid-cols-[1fr_2fr_auto] gap-2 mb-2 items-center">
             <input
               type="text"
               className="form-input"
               placeholder="Nhãn (vd: Mong muốn)"
+              aria-label="Nhãn (vd: Mong muốn)"
               value={fact.label || ''}
               onChange={(e) => handleFactsChange(idx, 'label', e.target.value)}
             />
@@ -112,15 +103,16 @@ export default function GeneralInfoEditor({ cv, onChange, review }) {
               type="text"
               className="form-input"
               placeholder="Nội dung"
+              aria-label="Nội dung"
               value={fact.value || ''}
               onChange={(e) => handleFactsChange(idx, 'value', e.target.value)}
             />
             <button
               type="button"
-              className="btn btn-tertiary"
+              className="btn btn-tertiary text-err p-1"
               onClick={() => removeFact(idx)}
-              style={{ color: 'var(--err)', padding: 'var(--sp-1)' }}
               title="Xoá dòng"
+              aria-label="Xoá dòng"
             >
               ✕
             </button>

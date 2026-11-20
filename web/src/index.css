@@ -1,1 +1,74 @@
-@import './styles.css';
+/* Điểm vào CSS: Tailwind v4 + token (tokens.css, sinh từ system/infra/tokens.py) + CSS thành phần */
+@import 'tailwindcss';
+
+/* Font tự host (không gọi Google Fonts): chỉ một họ Be Vietnam Pro, gồm subset tiếng Việt */
+@import '@fontsource/be-vietnam-pro/latin-400.css';
+@import '@fontsource/be-vietnam-pro/latin-500.css';
+@import '@fontsource/be-vietnam-pro/latin-600.css';
+@import '@fontsource/be-vietnam-pro/latin-700.css';
+@import '@fontsource/be-vietnam-pro/vietnamese-400.css';
+@import '@fontsource/be-vietnam-pro/vietnamese-500.css';
+@import '@fontsource/be-vietnam-pro/vietnamese-600.css';
+@import '@fontsource/be-vietnam-pro/vietnamese-700.css';
+
+@import './tokens.css';
+
+/*
+ * Ánh xạ token -> theme Tailwind (giá trị luôn đọc từ biến trong tokens.css, không lặp lại hex).
+ * Khoảng cách: 1 đơn vị Tailwind = 4px, tức p-1 = --sp-1, p-2 = --sp-2, p-3 = --sp-3, p-4 = --sp-4,
+ * p-6 = --sp-5 (24px), p-8 = --sp-6 (32px), p-10 = --sp-7 (40px).
+ */
+@theme inline {
+  --color-*: initial;
+  --color-navy: var(--navy);
+  --color-navy-50: var(--navy-50);
+  --color-navy-100: var(--navy-100);
+  --color-gold: var(--gold);
+  --color-gold-text: var(--gold-text);
+  --color-gold-100: var(--gold-100);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-white: var(--white);
+  --color-soft: var(--soft);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ok: var(--ok);
+  --color-ok-bg: var(--ok-bg);
+  --color-ok-line: var(--ok-line);
+  --color-warn: var(--warn);
+  --color-warn-bg: var(--warn-bg);
+  --color-warn-line: var(--warn-line);
+  --color-err: var(--err);
+  --color-err-bg: var(--err-bg);
+  --color-err-line: var(--err-line);
+  --color-info: var(--info);
+  --color-info-bg: var(--info-bg);
+  --color-info-line: var(--info-line);
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  --text-xs: var(--fs-xs);
+  --text-sm: var(--fs-sm);
+  --text-md: var(--fs-md);
+  --text-base: var(--fs-base);
+  --text-lg: var(--fs-lg);
+  --text-xl: var(--fs-xl);
+
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+  --radius-pill: var(--r-pill);
+
+  --shadow-sheet: var(--shadow-sheet);
+  --shadow-card: var(--shadow-card);
+  --ease-brand: var(--ease);
+}
+
+@theme {
+  --spacing: 4px;
+  --font-sans: 'Be Vietnam Pro', system-ui, sans-serif;
+}
+
+/* CSS thành phần cũ nằm ở layer components: utility Tailwind luôn thắng khi cần ghi đè */
+@import './styles.css' layer(components);

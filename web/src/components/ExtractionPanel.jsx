@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
+import Field from './Field.jsx'
 import { SUPPORTED_LANGUAGES } from '@/i18n/config.jsx'
 
 const ICON_FILE = (
@@ -95,6 +96,7 @@ export default function ExtractionPanel({
   const [copied, setCopied] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef(null)
+  const fileInputId = useId()
 
   const hasData = Boolean(cvData)
   const isBusy = isExtracting || isBuildingPdf
@@ -188,12 +190,12 @@ export default function ExtractionPanel({
         {/* THẺ NẠP FILE CV: Hiển thị form nạp khi chưa có CV, hoặc hiển thị thẻ thông tin file đã nạp */}
         {!hasData && !isBusy ? (
           <form className="upload-stateful-card" onSubmit={handleSubmit}>
-            <div
+            <label
+              htmlFor={fileInputId}
               className={`dropzone-stateful ${isDragging ? 'dragging' : ''} ${file ? 'has-file' : ''}`}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              onClick={() => fileInputRef.current && fileInputRef.current.click()}
             >
               <div className="dropzone-icon">{ICON_UPLOAD}</div>
               <div className="dropzone-content">
@@ -212,17 +214,17 @@ export default function ExtractionPanel({
                 )}
               </div>
               <input
+                id={fileInputId}
                 type="file"
                 ref={fileInputRef}
                 onChange={handleFileChange}
-                style={{ display: 'none' }}
+                className="sr-only"
                 accept=".pdf,.docx,.png,.jpg,.jpeg"
               />
-            </div>
+            </label>
 
             <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Tên dự án</label>
+              <Field label="Tên dự án">
                 <input
                   type="text"
                   className="form-input"
@@ -230,9 +232,8 @@ export default function ExtractionPanel({
                   value={inputProject}
                   onChange={(e) => setInputProject(e.target.value)}
                 />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Vị trí ứng tuyển</label>
+              </Field>
+              <Field label="Vị trí ứng tuyển">
                 <input
                   type="text"
                   className="form-input"
@@ -240,11 +241,11 @@ export default function ExtractionPanel({
                   value={inputPosition}
                   onChange={(e) => setInputPosition(e.target.value)}
                 />
-              </div>
+              </Field>
             </div>
 
-            <div className="form-group" style={{ marginBottom: 'var(--sp-4)' }}>
-              <label className="form-label">Ngôn ngữ xuất hồ sơ</label>
+            <fieldset className="form-fieldset mb-4">
+              <legend className="form-label">Ngôn ngữ xuất hồ sơ</legend>
               <div className="lang-options">
                 {SUPPORTED_LANGUAGES.map((l) => (
                   <label key={l.code}>
@@ -255,11 +256,11 @@ export default function ExtractionPanel({
                       checked={inputLang === l.code}
                       onChange={() => setInputLang(l.code)}
                     />
-                    {l.flag} {l.label}
+                    {l.label}
                   </label>
                 ))}
               </div>
-            </div>
+            </fieldset>
 
             <button
               type="submit"
@@ -290,7 +291,7 @@ export default function ExtractionPanel({
 
         {/* CẢNH BÁO LỖI NẾU CÓ */}
         {error && (
-          <div className="lh-alert err" style={{ marginTop: 'var(--sp-3)' }}>
+          <div className="lh-alert err mt-3" role="alert">
             <div className="t">Không thể hoàn tất bóc tách CV</div>
             <div className="m">{error}</div>
           </div>
@@ -298,8 +299,8 @@ export default function ExtractionPanel({
 
         {/* HÀNG CHỜ XỬ LÝ NẾU CÓ */}
         {isBusy && queuePos > 0 && (
-          <div className="queue-banner">
-            <div className="q-spinner" />
+          <div className="queue-banner" role="status" aria-live="polite">
+            <div className="q-spinner" aria-hidden="true" />
             <div className="q-text">
               Đang trong hàng đợi ({queueWhat}): <strong>Vị trí thứ #{queuePos}</strong>. Hệ thống sẽ tự động bắt đầu khi tới lượt.
             </div>
@@ -310,7 +311,7 @@ export default function ExtractionPanel({
         <div className="pipeline-card">
           <div className="pipeline-header">
             <div className="ph-title">Tiến trình các bước bóc tách</div>
-            <div className="ph-badge">
+            <div className="ph-badge" role="status" aria-live="polite">
               {hasData
                 ? elapsedSeconds
                   ? `Hoàn tất trong ${elapsedSeconds}s (100%)`
@@ -460,7 +461,7 @@ export default function ExtractionPanel({
 
             {/* 7. Thông báo lỗi hồ sơ nếu có */}
             {totalErrors > 0 && (
-              <div className="lh-alert err">
+              <div className="lh-alert err" role="alert">
                 <div className="t">Còn {totalErrors} lỗi cần xử lý</div>
                 <div className="m">Vui lòng kiểm tra và sửa đổi ở tab &quot;Chỉnh sửa nội dung&quot; trước khi tải PDF.</div>
               </div>
@@ -476,6 +477,7 @@ export default function ExtractionPanel({
                     className="btn-copy-summary"
                     onClick={handleCopySummary}
                     title="Sao chép toàn bộ tóm tắt"
+                    aria-label="Sao chép toàn bộ tóm tắt"
                   >
                     {ICON_COPY}
                     {copied ? 'Đã sao chép!' : 'Sao chép'}

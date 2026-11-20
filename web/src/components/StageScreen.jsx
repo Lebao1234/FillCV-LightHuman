@@ -24,23 +24,23 @@ export default function StageScreen({
     <div className={`lh-stage ${busy ? 'lh-busy' : ''}`}>
       <div className="lh-sheet">
         <div className="hd">
-          <div className="r" style={{ width: '30%' }} />
-          <div className="r" style={{ width: '22%' }} />
+          <div className="r w-[30%]" />
+          <div className="r w-[22%]" />
         </div>
         <div className="r ttl" />
         <div className="r acc" />
-        <div className="r" style={{ width: '70%' }} />
+        <div className="r w-[70%]" />
         <div className="gap" />
-        <div className="r" style={{ width: '40%' }} />
-        <div className="r" style={{ width: '96%' }} />
-        <div className="r" style={{ width: '90%' }} />
-        <div className="r" style={{ width: '94%' }} />
-        <div className="r" style={{ width: '62%' }} />
+        <div className="r w-[40%]" />
+        <div className="r w-[96%]" />
+        <div className="r w-[90%]" />
+        <div className="r w-[94%]" />
+        <div className="r w-[62%]" />
         <div className="gap" />
-        <div className="r" style={{ width: '46%' }} />
-        <div className="r" style={{ width: '92%' }} />
-        <div className="r" style={{ width: '88%' }} />
-        <div className="r" style={{ width: '70%' }} />
+        <div className="r w-[46%]" />
+        <div className="r w-[92%]" />
+        <div className="r w-[88%]" />
+        <div className="r w-[70%]" />
       </div>
 
       <div className="txt">

@@ -14,6 +14,7 @@ import {
   ExperienceSection,
 } from './SectionEditors.jsx'
 
+import Field from '../Field.jsx'
 const EDITORS_MAP = {
   text: TextSection,
   bullets: BulletsSection,
@@ -96,11 +97,10 @@ export default function ProfileForm({
   }
 
   return (
-    <div style={{ background: 'var(--white)', padding: 'var(--sp-4)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)' }}>
+    <div className="bg-white p-4 border border-line rounded-md">
       {/* Dự án và Vị trí */}
-      <div className="form-row" style={{ marginBottom: 'var(--sp-4)' }}>
-        <div className="form-group">
-          <label className="form-label">Tên dự án</label>
+      <div className="form-row mb-4">
+        <Field label="Tên dự án">
           <input
             type="text"
             className="form-input"
@@ -108,9 +108,8 @@ export default function ProfileForm({
             value={project || ''}
             onChange={(e) => onChangeProject(e.target.value)}
           />
-        </div>
-        <div className="form-group">
-          <label className="form-label">Vị trí (dùng cho tên file PDF)</label>
+        </Field>
+        <Field label="Vị trí (dùng cho tên file PDF)">
           <input
             type="text"
             className="form-input"
@@ -118,7 +117,7 @@ export default function ProfileForm({
             value={position || ''}
             onChange={(e) => onChangePosition(e.target.value)}
           />
-        </div>
+        </Field>
       </div>
 
       {/* Ảnh chân dung */}
@@ -131,15 +130,14 @@ export default function ProfileForm({
       <StatsEditor cv={cv} onChange={onChangeCv} review={review} />
 
       {/* Danh sách các mục nội dung */}
-      <div style={{ marginTop: 'var(--sp-5)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--sp-3)' }}>
-          <h4 style={{ margin: 0 }}>Các mục nội dung ({sections.length})</h4>
-          <div style={{ display: 'flex', gap: 'var(--sp-2)', alignItems: 'center' }}>
+      <div className="mt-6">
+        <div className="flex justify-between items-center mb-3">
+          <h4 className="m-0">Các mục nội dung ({sections.length})</h4>
+          <div className="flex gap-2 items-center">
             <select
-              className="form-input"
+              className="form-input text-sm py-1 px-2"
               value={newType}
               onChange={(e) => setNewType(e.target.value)}
-              style={{ fontSize: 'var(--fs-sm)', padding: '4px 8px' }}
             >
               {Object.entries(SECTION_TYPE_LABELS).map(([k, label]) => (
                 <option key={k} value={k}>
@@ -147,7 +145,7 @@ export default function ProfileForm({
                 </option>
               ))}
             </select>
-            <button type="button" className="btn btn-primary" onClick={addSection} style={{ fontSize: 'var(--fs-sm)' }}>
+            <button type="button" className="btn btn-primary text-sm" onClick={addSection}>
               + Thêm mục
             </button>
           </div>
@@ -158,70 +156,54 @@ export default function ProfileForm({
           const EditorComponent = EDITORS_MAP[sec.type] || TextSection
           return (
             <div
-              key={idx}
-              style={{
-                border: '1px solid var(--line)',
-                borderRadius: 'var(--r-md)',
-                marginBottom: 'var(--sp-3)',
-                background: 'var(--white)',
-                overflow: 'hidden',
-              }}
+              key={idx} className="border border-line rounded-md mb-3 bg-white overflow-hidden"
             >
               {/* Header của mục */}
               <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: 'var(--sp-2) var(--sp-3)',
-                  background: 'var(--soft)',
-                  borderBottom: isOpen ? '1px solid var(--line)' : 'none',
-                  cursor: 'pointer',
-                }}
+                className={`flex cursor-pointer items-center justify-between bg-soft px-3 py-2 ${isOpen ? 'border-b border-line' : ''}`}
                 onClick={() => toggleSection(idx)}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
-                  <span style={{ fontWeight: 600, fontSize: 'var(--fs-sm)', color: 'var(--ink)' }}>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-sm text-ink">
                     {idx + 1}. {sec.title || '(Chưa có tiêu đề)'}
                   </span>
-                  <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--faint)' }}>({sec.type})</span>
+                  <span className="text-xs text-faint">({sec.type})</span>
                   <ReviewBadge review={review} paths={`sections[${idx}]`} />
                 </div>
 
-                <div
-                  style={{ display: 'flex', gap: '4px', alignItems: 'center' }}
+                <div className="flex gap-1 items-center"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <button
                     type="button"
-                    className="btn btn-tertiary"
+                    className="btn btn-tertiary py-0.5 px-1.5"
                     onClick={() => moveSection(idx, -1)}
                     disabled={idx === 0}
-                    style={{ padding: '2px 6px' }}
                     title="Di chuyển lên"
+                    aria-label="Di chuyển lên"
                   >
                     ▲
                   </button>
                   <button
                     type="button"
-                    className="btn btn-tertiary"
+                    className="btn btn-tertiary py-0.5 px-1.5"
                     onClick={() => moveSection(idx, 1)}
                     disabled={idx === sections.length - 1}
-                    style={{ padding: '2px 6px' }}
                     title="Di chuyển xuống"
+                    aria-label="Di chuyển xuống"
                   >
                     ▼
                   </button>
                   <button
                     type="button"
-                    className="btn btn-tertiary"
+                    className="btn btn-tertiary text-err py-0.5 px-1.5"
                     onClick={() => removeSection(idx)}
-                    style={{ color: 'var(--err)', padding: '2px 6px' }}
                     title="Xoá mục này"
+                    aria-label="Xoá mục này"
                   >
                     ✕
                   </button>
-                  <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--faint)', marginLeft: '4px' }}>
+                  <span className="text-xs text-faint ml-1">
                     {isOpen ? '▲' : '▼'}
                   </span>
                 </div>
@@ -229,18 +211,15 @@ export default function ProfileForm({
 
               {/* Nội dung bên trong mục khi mở */}
               {isOpen && (
-                <div style={{ padding: 'var(--sp-3)' }}>
-                  <div className="form-group" style={{ marginBottom: 'var(--sp-3)' }}>
-                    <label className="form-label" style={{ fontSize: 'var(--fs-xs)' }}>
-                      Tiêu đề mục
-                    </label>
+                <div className="p-3">
+                  <Field label="Tiêu đề mục" small className="mb-3">
                     <input
                       type="text"
                       className="form-input"
                       value={sec.title || ''}
                       onChange={(e) => updateSection(idx, { ...sec, title: e.target.value })}
                     />
-                  </div>
+                  </Field>
 
                   <EditorComponent section={sec} onChange={(updated) => updateSection(idx, updated)} />
                 </div>

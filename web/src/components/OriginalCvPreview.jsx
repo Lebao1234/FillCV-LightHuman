@@ -33,7 +33,7 @@ export default function OriginalCvPreview({ runId, originalName }) {
   if (loading) {
     return (
       <div className="preview-container">
-        <p style={{ color: 'var(--muted)' }}>Đang tải bản xem trước CV gốc...</p>
+        <p className="text-muted">Đang tải bản xem trước CV gốc...</p>
       </div>
     )
   }
@@ -41,9 +41,9 @@ export default function OriginalCvPreview({ runId, originalName }) {
   if (errorMsg || (info && !info.can_preview)) {
     return (
       <div className="preview-container">
-        <div className="lh-alert info" style={{ maxWidth: '600px', width: '100%' }}>
+        <div className="lh-alert info max-w-[600px] w-full">
           <div className="t">Thông báo xem trước</div>
-          <p style={{ margin: 0 }}>
+          <p className="m-0">
             {info?.message || errorMsg || 'File này không hỗ trợ xem trước trực tiếp. Hãy mở file gốc trên máy để đối chiếu.'}
           </p>
         </div>
