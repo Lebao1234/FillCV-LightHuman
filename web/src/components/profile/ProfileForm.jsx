@@ -61,7 +61,8 @@ export default function ProfileForm({
   isTranslating = false,
   translateReport = null,
   translateError = null,
-  onTranslate,
+  lang = 'vi',
+  onChangeLang,
 }) {
   const [openSections, setOpenSections] = useState({})
   const [newType, setNewType] = useState('experience')
@@ -145,13 +146,16 @@ export default function ProfileForm({
         </div>
       )}
 
-      {/* Dịch sang tiếng Anh (chỉ hiện khi máy chủ đã bật dịch máy) */}
+      {/* Chọn ngôn ngữ hồ sơ: English thì dịch máy nội dung (nếu máy chủ có), rồi dựng lại PDF */}
       <TranslatePanel
+        lang={lang}
+        sourceLang={cv.language}
         available={translationAvailable}
         isTranslating={isTranslating}
+        isBusy={isSaving}
         report={translateReport}
         error={translateError}
-        onTranslate={onTranslate}
+        onChangeLang={onChangeLang}
       />
 
       {/* Dự án và Vị trí */}

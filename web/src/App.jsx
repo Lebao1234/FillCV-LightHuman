@@ -324,23 +324,6 @@ export default function App() {
     }
   }
 
-  // Dịch nội dung hồ sơ sang tiếng Anh; kết quả thay vào form để nhân viên đọc lại và sửa trước khi lưu
-  const handleTranslate = async () => {
-    if (!cvData || isTranslating) return
-    const ok = window.confirm(
-      'Dịch nội dung hồ sơ sang tiếng Anh bằng dịch máy?\n\n' +
-        'Nội dung đang sửa sẽ được thay bằng bản dịch (có thể quay lại bằng "Về bản đọc ban đầu"). ' +
-        'Dịch máy chỉ là bản nháp: hãy đọc lại toàn bộ trước khi gửi khách.'
-    )
-    if (!ok) return
-    const en = await translateNow(cvData, runId)
-    if (en) {
-      translatedRef.current = { vi: cvData, en }
-      setPdfLang('en')
-      handleCvChange(en, 'en')
-    }
-  }
-
   // Gọi dịch máy cho một hồ sơ (không hỏi lại); trả hồ sơ đã dịch hoặc null nếu lỗi
   const translateNow = async (cv, rid) => {
     setIsTranslating(true)
@@ -422,7 +405,7 @@ export default function App() {
     handleTabKeyDown, pdfData, pdfStatus, handleBuildPdf, runId, keepContact, checkedGenerated,
     setCheckedGenerated, reviewed, setReviewed, handleChangeLang, handleChangeKeepContact,
     handleCvChange, handleSaveEdits, handleRevert, photoUrl, setPhotoUrl, isDirty, savedAt,
-    translation: config?.translation, isTranslating, translateReport, translateError, handleTranslate,
+    translation: config?.translation, isTranslating, translateReport, translateError,
   }
 
   return (

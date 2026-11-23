@@ -20,27 +20,61 @@ function TranslateProgress() {
   )
 }
 
-// Khung dịch nội dung hồ sơ sang tiếng Anh bằng dịch máy offline (chỉ hiện khi máy chủ đã bật dịch máy)
-export default function TranslatePanel({ available = false, isTranslating = false, report = null, error = null, onTranslate }) {
-  if (!available) return null
+// Câu giải thích dưới thanh chuyển ngôn ngữ, tuỳ ngôn ngữ CV gốc và việc máy chủ có dịch máy hay không
+function hintText({ sourceIsEnglish, available, lang }) {
+  if (sourceIsEnglish) {
+    return lang === 'vi'
+      ? 'CV gốc tiếng Anh: bản Tiếng Việt chỉ đổi nhãn và tiêu đề mục, nội dung giữ tiếng Anh (chưa có dịch máy Anh → Việt).'
+      : 'CV gốc tiếng Anh: nội dung giữ nguyên như bản gốc.'
+  }
+  if (!available) {
+    return 'Máy chủ chưa bật dịch máy: chọn English chỉ đổi nhãn và tiêu đề mục, nội dung giữ tiếng Việt.'
+  }
+  return 'Chọn English: nội dung được dịch máy ngay trên máy chủ (CV không gửi ra ngoài); họ tên, tên công ty, tên trường giữ nguyên. Bản dịch là bản nháp, cần đọc lại. Về Tiếng Việt: khôi phục bản tiếng Việt nếu chưa sửa sau khi dịch.'
+}
 
+// Thanh chọn ngôn ngữ hồ sơ trong trang chỉnh sửa: đổi ngôn ngữ = dịch (nếu cần) + dựng lại PDF theo ngôn ngữ mới
+export default function TranslatePanel({
+  lang = 'vi',
+  sourceLang = 'vi',
+  available = false,
+  isTranslating = false,
+  isBusy = false,
+  report = null,
+  error = null,
+  onChangeLang,
+}) {
+  const sourceIsEnglish = sourceLang === 'en'
   const summary = report?.summary
   const keptItems = (report?.items || []).filter((i) => i.status === 'kept')
+  const options = [
+    { code: 'vi', label: 'Tiếng Việt' },
+    { code: 'en', label: 'English' },
+  ]
 
   return (
     <div className="mb-4 rounded-md border border-line bg-soft p-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h4 className="m-0">Dịch nội dung sang tiếng Anh</h4>
-          <p className="m-0 mt-1 text-sm text-muted">
-            Dịch máy chạy ngay trên máy chủ, CV không gửi ra ngoài. Họ tên, tên công ty, tên trường và thời gian được giữ nguyên; thẻ kỹ năng chỉ đổi khi có trong bảng thuật ngữ.
-            Đây chỉ là bản nháp: hãy đọc lại toàn bộ trước khi gửi khách.
-          </p>
+        <h4 className="m-0">Ngôn ngữ hồ sơ</h4>
+        <div role="radiogroup" aria-label="Ngôn ngữ hồ sơ" className="inline-flex overflow-hidden rounded-md border border-line bg-white">
+          {options.map((o) => (
+            <button
+              key={o.code}
+              type="button"
+              role="radio"
+              aria-checked={lang === o.code}
+              disabled={isTranslating || isBusy}
+              onClick={() => lang !== o.code && onChangeLang && onChangeLang(o.code)}
+              className={`px-4 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed ${
+                lang === o.code ? 'bg-navy text-white' : 'text-ink hover:bg-soft'
+              }`}
+            >
+              {o.label}
+            </button>
+          ))}
         </div>
-        <button type="button" className="btn btn-secondary text-sm" onClick={onTranslate} disabled={isTranslating}>
-          {isTranslating ? 'Đang dịch...' : 'Dịch sang tiếng Anh'}
-        </button>
       </div>
+      <p className="m-0 mt-2 text-sm text-muted">{hintText({ sourceIsEnglish, available, lang })}</p>
 
       {isTranslating && <TranslateProgress />}
 
@@ -49,11 +83,12 @@ export default function TranslatePanel({ available = false, isTranslating = fals
           <div className="t">Chưa dịch được</div>
           <ul>
             <li>{error}</li>
+            <li>Bản PDF vẫn đổi nhãn sang English, nội dung giữ tiếng Việt.</li>
           </ul>
         </div>
       )}
 
-      {summary && (
+      {summary && lang === 'en' && !isTranslating && (
         <div className={`lh-alert mt-3 ${keptItems.length > 0 ? 'warn' : 'ok'}`} role="status">
           <div className="t">
             Đã dịch {summary.translated + summary.glossary} đoạn
@@ -61,8 +96,7 @@ export default function TranslatePanel({ available = false, isTranslating = fals
             {summary.kept > 0 ? `, ${summary.kept} đoạn giữ nguyên tiếng Việt` : ''}
           </div>
           <ul>
-            <li>Ngôn ngữ xuất PDF đã chuyển sang English. Sửa lại nội dung nếu cần rồi bấm Lưu & cập nhật PDF.</li>
-            {summary.skipped > 0 && <li>{summary.skipped} đoạn không có dấu tiếng Việt nên được bỏ qua (đã là tiếng Anh hoặc gõ không dấu).</li>}
+            <li>Đọc lại và sửa bản dịch bên dưới rồi bấm Lưu & cập nhật PDF.</li>
           </ul>
           {keptItems.length > 0 && (
             <details className="mt-1">

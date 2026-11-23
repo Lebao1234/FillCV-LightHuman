@@ -15,7 +15,7 @@ export default function HomePage() {
     handleBuildPdf, runId, keepContact, checkedGenerated, setCheckedGenerated, reviewed, setReviewed,
     handleChangeLang, handleChangeKeepContact, handleCvChange, setProject, setPosition, photoUrl, setPhotoUrl,
     isDirty, savedAt, handleSaveEdits, handleRevert, translation, isTranslating, translateReport,
-    translateError, handleTranslate,
+    translateError,
   } = useOutletContext()
 
   return (
@@ -140,7 +140,8 @@ export default function HomePage() {
                   isTranslating={isTranslating}
                   translateReport={translateReport}
                   translateError={translateError}
-                  onTranslate={handleTranslate}
+                  lang={pdfLang}
+                  onChangeLang={handleChangeLang}
                 />
               )}
 
