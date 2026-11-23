@@ -214,6 +214,7 @@ def build_experience(raw: RawSection, items: list[Item], today: date) -> Built |
         used.update(head)
         starts.append((a, head[0], head))
     job = None
+    built_anchor_x = 0.0                                          # lề trái của dòng thời gian công việc gần nhất
     for n, (a, first, head) in enumerate(starts):
         end = starts[n + 1][1] if n + 1 < len(starts) else len(items)
         parts: list[tuple[str, Line]] = []

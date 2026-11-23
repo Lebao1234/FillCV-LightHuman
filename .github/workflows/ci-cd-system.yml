@@ -79,7 +79,7 @@ jobs:
           cache: pip
           cache-dependency-path: system/requirements*.txt
 
-      - run: python -m pip install ruff
+      - run: python -m pip install ruff==0.17.4
 
       - name: Kiểm tra lỗi code
         run: ruff check .

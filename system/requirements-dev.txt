@@ -1,5 +1,6 @@
 # Cho người phát triển: thư viện app + công cụ test
 -r requirements.txt
+httpx2==2.16.0               # starlette.testclient bắt buộc (chỉ cho test)
 pytest==9.2.0
 coverage==7.17.2
 python-docx==1.2.0           # test dựng file DOCX giả (app không cần)
