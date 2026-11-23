@@ -126,6 +126,44 @@ def extractor_name() -> str:
     return os.getenv("CV_EXTRACTOR", "").strip().lower() or "rules"
 
 
+# Dịch máy offline: bật/tắt
+def translator_name() -> str:
+    """Bộ dịch nội dung CV vi -> en. CV_TRANSLATOR; mặc định "nmt" (dịch máy offline, chỉ dùng được khi đã cài mô hình).
+    "none" = tắt hẳn, giao diện ẩn nút dịch."""
+    return os.getenv("CV_TRANSLATOR", "").strip().lower() or "nmt"
+
+
+# Thư mục chứa mô hình dịch máy đã chuyển sang CTranslate2
+def translate_model_dir() -> Path:
+    """Thư mục mô hình dịch máy (model.bin + source.spm + target.spm). TRANSLATE_MODEL_DIR; mặc định data/models/opus-mt-vi-en."""
+    return _env_path("TRANSLATE_MODEL_DIR", REPO_ROOT / "data" / "models" / "opus-mt-vi-en")
+
+
+# Nạp sẵn mô hình dịch khi khởi động
+def translate_preload() -> bool:
+    """Nạp mô hình dịch ngay khi app khởi động (nền) để lần dịch đầu không phải chờ nạp. TRANSLATE_PRELOAD=0 để tắt
+    (tiết kiệm ~0,7 GB RAM với VinAI nếu hiếm khi dùng)."""
+    return os.getenv("TRANSLATE_PRELOAD", "1").strip().lower() not in {"0", "false", "no", "off"}
+
+
+# Số lượt dịch chạy cùng lúc
+def translate_max_concurrent() -> int:
+    """Số lượt dịch CV chạy CÙNG LÚC trên toàn app. TRANSLATE_MAX_CONCURRENT; mặc định 1 (mô hình nạp một lần, tốn CPU)."""
+    return _env_int("TRANSLATE_MAX_CONCURRENT", 1)
+
+
+# Hạn giây chờ tới lượt dịch
+def translate_queue_timeout() -> int:
+    """Số giây tối đa một người chờ tới lượt dịch. TRANSLATE_QUEUE_TIMEOUT; mặc định 120."""
+    return _env_int("TRANSLATE_QUEUE_TIMEOUT", 120)
+
+
+# Số luồng CPU cho một lượt dịch
+def translate_threads() -> int:
+    """Số luồng CPU của bộ dịch. TRANSLATE_THREADS; mặc định 2 (chừa CPU cho Chromium dựng PDF)."""
+    return _env_int("TRANSLATE_THREADS", 2)
+
+
 # S7: dung lượng tối đa của file tải lên (MB). Phải khớp server.maxUploadSize trong .streamlit/config.toml.
 MAX_UPLOAD_MB = _env_int("MAX_UPLOAD_MB", 20)
 

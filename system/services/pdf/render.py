@@ -1,4 +1,4 @@
-﻿# Gói services/pdf/: dựng PDF — template.html -> HTML -> Chromium (render_worker, tiến trình riêng).
+# Gói services/pdf/: dựng PDF — template.html -> HTML -> Chromium (render_worker, tiến trình riêng).
 """Bước 2: dựng JSON hồ sơ thành HTML rồi xuất PDF chuẩn Light Human.
 
 Hàm chính: build_pdf(cv, project, position, photo_bytes, out_dir, lang='vi') -> Path
@@ -130,21 +130,44 @@ PHOTO_SEARCH_PAGES = 2              # ảnh chân dung thường ở 1–2 trang
 
 # Bộ nhận diện khuôn mặt OpenCV (cache)
 @lru_cache(maxsize=1)
-def _face_detector():
-    """Bộ nhận diện khuôn mặt Haar của OpenCV. Không cài OpenCV -> None (bỏ qua bước tìm mặt)."""
+def _face_detectors():
+    """Tập các bộ nhận diện khuôn mặt Haar của OpenCV (frontal alt2, frontal default, profile)."""
     try:
         import cv2
     except ImportError:
-        return None
-    detector = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
-    return None if detector.empty() else detector
+        return []
+    configs = [
+        ("frontal_alt2", "haarcascade_frontalface_alt2.xml", 1.1, min(FACE_MIN_NEIGHBORS, 4)),
+        ("frontal_default", "haarcascade_frontalface_default.xml", FACE_SCALE_FACTOR, FACE_MIN_NEIGHBORS),
+        ("profile", "haarcascade_profileface.xml", 1.1, min(FACE_MIN_NEIGHBORS, 4)),
+    ]
+    detectors = []
+    for tag, fname, sf, mn in configs:
+        path = cv2.data.haarcascades + fname
+        det = cv2.CascadeClassifier(path)
+        if not det.empty():
+            detectors.append((tag, det, sf, mn))
+    return detectors
+
+
+@lru_cache(maxsize=1)
+def _face_detector():
+    """Bộ nhận diện khuôn mặt Haar mặc định (giữ tương thích)."""
+    dets = _face_detectors()
+    for tag, det, _, _ in dets:
+        if tag == "frontal_default":
+            return det
+    return dets[0][1] if dets else None
 
 
 # Tìm khuôn mặt lớn nhất
 def _find_face(im: Image.Image) -> tuple[int, int, int, int] | None:
-    """Tìm khuôn mặt lớn nhất trong ảnh. Trả (x, y, w, h) theo pixel của ảnh gốc, hoặc None."""
-    detector = _face_detector()
-    if detector is None:
+    """Tìm khuôn mặt lớn nhất trong ảnh. Trả (x, y, w, h) theo pixel của ảnh gốc, hoặc None.
+
+    Thử lần lượt frontal (alt2, default) và profile (góc nghiêng + lật ngang).
+    """
+    detectors = _face_detectors()
+    if not detectors:
         return None
     import cv2
     import numpy as np
@@ -153,11 +176,51 @@ def _find_face(im: Image.Image) -> tuple[int, int, int, int] | None:
     scale = min(1.0, FACE_DETECT_MAX_PX / max(gray.shape))            # ảnh quá lớn -> thu nhỏ cho nhanh
     if scale < 1:
         gray = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
-    face = detector.detectMultiScale(gray, scaleFactor=FACE_SCALE_FACTOR, minNeighbors=FACE_MIN_NEIGHBORS,
-                               minSize=(FACE_MIN_SIZE_PX, FACE_MIN_SIZE_PX))
-    if len(face) == 0:
+
+    all_faces = []
+    # 1. Thử nhận diện khuôn mặt chính diện trước
+    for tag, det, sf, mn in detectors:
+        if tag.startswith("frontal"):
+            faces = det.detectMultiScale(
+                gray,
+                scaleFactor=sf,
+                minNeighbors=mn,
+                minSize=(FACE_MIN_SIZE_PX, FACE_MIN_SIZE_PX),
+            )
+            if len(faces) > 0:
+                all_faces.extend(faces)
+                break
+
+    # 2. Nếu chưa thấy mặt chính diện, thử nhận diện mặt nghiêng (profile) và ảnh lật ngang
+    if not all_faces:
+        for tag, det, sf, mn in detectors:
+            if tag == "profile":
+                faces = det.detectMultiScale(
+                    gray,
+                    scaleFactor=sf,
+                    minNeighbors=mn,
+                    minSize=(FACE_MIN_SIZE_PX, FACE_MIN_SIZE_PX),
+                )
+                if len(faces) > 0:
+                    all_faces.extend(faces)
+                    break
+                flipped = cv2.flip(gray, 1)
+                f_flip = det.detectMultiScale(
+                    flipped,
+                    scaleFactor=sf,
+                    minNeighbors=mn,
+                    minSize=(FACE_MIN_SIZE_PX, FACE_MIN_SIZE_PX),
+                )
+                if len(f_flip) > 0:
+                    w_img = gray.shape[1]
+                    for (fx, fy, fw, fh) in f_flip:
+                        orig_fx = w_img - (fx + fw)
+                        all_faces.append((orig_fx, fy, fw, fh))
+                    break
+
+    if not all_faces:
         return None
-    x, y, w, h = max(face, key=lambda m: m[2] * m[3])
+    x, y, w, h = max(all_faces, key=lambda m: m[2] * m[3])
     return tuple(int(round(v / scale)) for v in (x, y, w, h))
 
 
@@ -244,7 +307,7 @@ def crop_portrait(img_bytes: bytes) -> bytes:
 def _pick_photo(candidates: list[tuple[bytes, float, int]]) -> bytes | None:
     """Chọn ảnh chân dung từ danh sách (ảnh, tỉ lệ cao/rộng khi hiển thị, độ ưu tiên vị trí).
 
-    Có khuôn mặt -> ưu tiên. Không tìm được mặt -> chỉ nhận ảnh dọc (tránh lấy nhầm logo, mã QR vuông).
+    Có khuôn mặt hoặc avatar tròn bo góc -> ưu tiên. Không tìm được mặt -> chỉ nhận ảnh dọc (tránh lấy nhầm logo, mã QR vuông).
     """
     best = None
     for data, ratio, priority in candidates:
@@ -256,9 +319,10 @@ def _pick_photo(candidates: list[tuple[bytes, float, int]]) -> bytes | None:
             log.warning("Bỏ qua một ảnh ứng viên không đọc được", exc_info=True)
             continue
         has_face = _find_face(im) is not None
-        if not has_face and not (PORTRAIT_ASPECT[0] <= ratio <= PORTRAIT_ASPECT[1]):
+        has_round = _box_inside_round_avatar(im.split()[-1]) is not None if "A" in im.mode else False
+        if not has_face and not has_round and not (PORTRAIT_ASPECT[0] <= ratio <= PORTRAIT_ASPECT[1]):
             continue
-        score = (has_face, priority, im.width * im.height)
+        score = (has_face, has_round, priority, im.width * im.height)
         if best is None or score > best[0]:
             best = (score, data)
     return crop_portrait(best[1]) if best else None
@@ -380,7 +444,8 @@ def pdf_css(font_size: float, line_height: float) -> Markup:
     return Markup("\n".join([
         f"@page {{ size: A4; margin: {m['top']}mm {m['right']}mm {m['bottom']}mm {m['left']}mm; }}",
         css_vars("pdf"),
-        f"body {{ font-family:{FONT['serif-pdf']}; font-size:{font_size}pt; line-height:{line_height}; }}",
+        f"html, body, table, tr, td, th, div, p, span, h1, h2, ul, li {{ font-family:{FONT['serif-pdf']}; }}",
+        f"body {{ font-size:{font_size}pt; line-height:{line_height}; }}",
         (TEMPLATE_DIR / "template.css").read_text(encoding="utf-8"),
     ]))
 

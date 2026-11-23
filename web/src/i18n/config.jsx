@@ -146,6 +146,25 @@ export function translateSectionTitle(title, targetLang = 'vi') {
   const clean = normalizeKey(title)
   const isTargetEn = targetLang === 'en'
 
+  // Chuẩn hoá các biến thể của Giới thiệu / About me về Mục tiêu nghề nghiệp / Career Objective
+  const introVariants = [
+    'gioi thieu', 'gioi thieu ban than', 'about me', 'profile', 'summary', 'tom tat', 'tom tat ban than',
+    'muc tieu', 'muc tieu nghe nghiep', 'muc tieu cong viec', 'career objective', 'objective', 'objectives'
+  ]
+  const unaccented = clean
+    .replace(/[àáạảãâầấậẩẫăằắặẳẵ]/g, 'a')
+    .replace(/[èéẹẻẽêềếệểễ]/g, 'e')
+    .replace(/[ìíịỉĩ]/g, 'i')
+    .replace(/[òóọỏõôồốộổỗơờớợởỡ]/g, 'o')
+    .replace(/[ùúụủũưừứựửữ]/g, 'u')
+    .replace(/[ỳýỵỷỹ]/g, 'y')
+    .replace(/đ/g, 'd')
+
+  if (introVariants.some((v) => unaccented === v || unaccented.includes(v))) {
+    const translated = isTargetEn ? 'Career Objective' : 'Mục tiêu nghề nghiệp'
+    return title === title.toUpperCase() ? translated.toUpperCase() : translated
+  }
+
   for (const key of Object.keys(SECTION_TITLES)) {
     const item = SECTION_TITLES[key]
     if (normalizeKey(item.vi) === clean || normalizeKey(item.en) === clean) {

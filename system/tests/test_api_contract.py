@@ -192,7 +192,7 @@ def test_build_pdf_contract(monkeypatch, tmp_path):
     from services.pdf import render
     from services.privacy import checks
     monkeypatch.setattr(render, "build_pdf", lambda cv, prj, pos, photo, folder, lang="vi": dummy_pdf)
-    monkeypatch.setattr(checks, "scan_pdf", lambda p, lang="vi": [
+    monkeypatch.setattr(checks, "scan_pdf", lambda p, lang="vi", keep_contact=False: [
         {"code": "pii", "item": "PII", "ok": True, "detail": "Sạch"}
     ])
 
@@ -218,6 +218,73 @@ def test_build_pdf_contract(monkeypatch, tmp_path):
         assert data["run_id"] == run_id
         assert data["lang"] == "vi"
         assert "outdated" in data["status"]
+
+
+# Test /api/pdf/build: dựng từ hồ sơ đã dọn, trả lại bản chuẩn hoá, từ chối hồ sơ sai cấu trúc
+def test_build_pdf_cleans_cv_and_rejects_invalid(monkeypatch, tmp_path):
+    fake_cv = load_fake_cv()
+
+    dummy_pdf = tmp_path / "dummy2.pdf"
+    import pymupdf as fitz
+    doc = fitz.open()
+    doc.new_page()
+    doc.save(str(dummy_pdf))
+    doc.close()
+
+    from services.pdf import render
+    from services.privacy import checks
+    seen = {}
+
+    def fake_build(cv, prj, pos, photo, folder, lang="vi"):
+        seen["cv"] = cv
+        return dummy_pdf
+
+    monkeypatch.setattr(render, "build_pdf", fake_build)
+    monkeypatch.setattr(checks, "scan_pdf", lambda p, lang="vi", keep_contact=False: [{"code": "pii", "item": "PII", "ok": True, "detail": "Sạch"}])
+
+    dirty = dict(fake_cv)
+    dirty["full_name"] = "  Nguyễn Văn A  "
+    dirty["sections"] = [{
+        "type": "bullets", "title": " Điểm mạnh ", "paragraphs": [], "tags": [], "cards": [],
+        "career_path": [], "jobs": [], "education": [], "references": [],
+        "bullets": ["Ý một", "", "   ", "Ý hai  "],
+    }]
+
+    with TestClient(app) as client:
+        res = client.post("/api/pdf/build", json={"run_id": "test_clean_run", "cv": dirty, "project": "P", "position": "Q"})
+        assert res.status_code == 200
+        data = res.json()
+        # Template nhận hồ sơ đã dọn: không còn gạch đầu dòng rỗng, khoảng trắng đã cắt
+        assert seen["cv"]["full_name"] == "Nguyễn Văn A"
+        assert seen["cv"]["sections"][0]["title"] == "Điểm mạnh"
+        assert seen["cv"]["sections"][0]["bullets"] == ["Ý một", "Ý hai"]
+        # Bản chuẩn hoá được trả về để giao diện đồng bộ lại form
+        assert data["cv"]["sections"][0]["bullets"] == ["Ý một", "Ý hai"]
+        # Dấu vân tay khớp với /api/cv/validate trên cùng nội dung -> trạng thái không báo "cũ" oan
+        val = client.post("/api/cv/validate", json={"cv": dirty, "project": "P", "position": "Q", "run_id": "test_clean_run"}).json()
+        assert val["fingerprint"] == data["fingerprint"]
+
+        # Hồ sơ sai cấu trúc (họ tên trống) -> 400, không dựng PDF
+        seen.clear()
+        bad = dict(fake_cv, full_name="   ")
+        res2 = client.post("/api/pdf/build", json={"run_id": "test_clean_run", "cv": bad})
+        assert res2.status_code == 400
+        assert "chưa hợp lệ" in res2.json()["error"]
+        assert "cv" not in seen
+
+
+# Test fallback SPA: mở thẳng /edit trả trang React, còn file/API không tồn tại vẫn 404
+def test_spa_fallback_serves_index_for_routes():
+    import pytest
+    from api import server
+    if server.web_dist is None or not (server.web_dist / "index.html").exists():
+        pytest.skip("Chưa build web/dist")
+    with TestClient(app) as client:
+        res = client.get("/edit")
+        assert res.status_code == 200
+        assert "text/html" in res.headers["content-type"]
+        assert client.get("/assets/khong-ton-tai.js").status_code == 404
+        assert client.get("/api/khong-ton-tai").status_code == 404
 
 
 # Test endpoint tải PDF và xem trước info

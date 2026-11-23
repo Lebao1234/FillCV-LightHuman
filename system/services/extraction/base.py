@@ -46,6 +46,7 @@ class SourceDoc:
     project: str = ""
     position: str = ""
     today: date | None = None
+    keep_contact: bool = False        # True: giữ SĐT/email/địa chỉ/link thành dòng thông tin thay vì cắt bỏ
 
 
 # Một giai đoạn bộ trích xuất khai báo (hiển thị trên màn hình "đang xử lý")

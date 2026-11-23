@@ -1,11 +1,10 @@
-import ReviewBadge from './ReviewBadge.jsx'
 
 import Field from '../Field.jsx'
 const MAX_STATS = 4
 const STAT_LABEL_MAX_LEN = 35
 
 // Thành phần chỉnh sửa hàng ô số liệu (tối đa 4 ô)
-export default function StatsEditor({ cv, onChange, review }) {
+export default function StatsEditor({ cv, onChange }) {
   const stats = cv.stats || []
 
   const handleStatChange = (index, field, value) => {
@@ -28,7 +27,6 @@ export default function StatsEditor({ cv, onChange, review }) {
       <div className="flex justify-between items-center mb-2">
         <div className="flex items-center">
           <h4 className="m-0">Hàng ô số liệu (tối đa 4)</h4>
-          <ReviewBadge review={review} paths="stats" />
         </div>
         {stats.length < MAX_STATS && (
           <button type="button" className="btn btn-tertiary text-xs" onClick={addStat}>

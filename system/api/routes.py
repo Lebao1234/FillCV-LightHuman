@@ -22,6 +22,7 @@ from core import pdf_status, pipeline
 from infra import logging_setup, settings
 from services.extraction import base as extraction
 from services.pdf import labels, render
+from services.translation import nmt
 from services.privacy import checks
 from api.state import RunData, run_store
 
@@ -66,6 +67,12 @@ async def get_config(request: Request) -> JSONResponse:
         "pdf_languages": dict(labels.PDF_LANGS),
         "logo_header_b64": logo_b64,
         "default_stage_labels": pipeline.stage_labels(),
+        "translation": {
+            "available": nmt.is_available(),
+            "source": "vi",
+            "target": "en",
+            "engine": nmt.engine_name() if nmt.is_available() else "",
+        },
     })
 
 
@@ -129,6 +136,7 @@ async def extract_cv(request: Request) -> Response:
     filename = getattr(file_field, "filename", "") or "cv"
     project = str(form.get("project") or "").strip()
     position = str(form.get("position") or "").strip()
+    keep_contact = str(form.get("keep_contact") or "").strip().lower() in {"1", "true", "yes", "on"}
 
     file_bytes = await file_field.read()
     if not file_bytes:
@@ -183,6 +191,7 @@ async def extract_cv(request: Request) -> Response:
                     position,
                     on_progress=on_progress,
                     on_wait=on_wait,
+                    keep_contact=keep_contact,
                 )
                 elapsed = round(time.monotonic() - t0, 2)
                 loop.call_soon_threadsafe(event_queue.put_nowait, ("result", (res, elapsed)))
@@ -242,14 +251,15 @@ async def validate_cv(request: Request) -> JSONResponse:
     position = str(body.get("position") or "")
     run_id = str(body.get("run_id") or "")
     lang = str(body.get("lang") or "vi")
+    keep_contact = bool(body.get("keep_contact", False))
 
     cv_normalized, structure_errors = pipeline.validate_structure(cv)
     active_cv = cv_normalized if not structure_errors else cv
-    violations = checks.scan_pii_export(active_cv, project, position)
+    violations = checks.scan_pii_export(active_cv, project, position, keep_contact=keep_contact)
 
     run = run_store.get(run_id) if run_id else None
     photo = run.photo if run else None
-    fingerprint = pipeline.content_fingerprint(active_cv, project, position, photo, lang)
+    fingerprint = pipeline.content_fingerprint(active_cv, project, position, photo, lang, keep_contact=keep_contact)
 
     return JSONResponse({
         "valid": not structure_errors and not violations,
@@ -257,6 +267,53 @@ async def validate_cv(request: Request) -> JSONResponse:
         "violations": violations,
         "normalized_cv": cv_normalized,
         "fingerprint": fingerprint,
+    })
+
+
+# Dịch nội dung hồ sơ tiếng Việt sang tiếng Anh (dịch máy offline)
+async def translate_cv(request: Request) -> JSONResponse:
+    """Dịch phần chữ tự do của hồ sơ vi -> en bằng dịch máy chạy trên máy chủ. Trả hồ sơ đã dịch + báo cáo từng đoạn."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Dữ liệu JSON không hợp lệ."}, status_code=400)
+
+    cv = body.get("cv")
+    if not cv:
+        return JSONResponse({"error": "Thiếu dữ liệu hồ sơ CV."}, status_code=400)
+    if not nmt.is_available():
+        return JSONResponse({"error": "Chưa bật dịch máy trên máy chủ (thiếu mô hình dịch). Hãy nhờ quản trị viên cài theo docs/dich-may-offline.md."}, status_code=503)
+
+    # Dịch trên hồ sơ đã dọn + kiểm tra cấu trúc (cùng luật với lúc lưu)
+    cv, structure_errors = pipeline.validate_structure(cv)
+    if structure_errors:
+        return JSONResponse({"error": "Hồ sơ chưa hợp lệ nên chưa dịch được: " + "; ".join(structure_errors)}, status_code=400)
+
+    run_id = str(body.get("run_id") or "")
+    if run_id:
+        logging_setup.set_run_id(run_id)
+
+    # Chạy dịch trong luồng riêng (gắn run_id cho log)
+    def do_translate():
+        if run_id:
+            logging_setup.set_run_id(run_id)
+        return nmt.translate_cv(cv)
+
+    try:
+        result = await asyncio.to_thread(do_translate)
+    except nmt.TranslateQueueTimeout as e:
+        return JSONResponse({"error": str(e)}, status_code=429)
+    except nmt.TranslatorUnavailable as e:
+        return JSONResponse({"error": str(e)}, status_code=503)
+    except Exception:
+        log.exception("Dịch máy thất bại")   # chỉ ghi loại lỗi + vết gọi, không ghi nội dung CV
+        return JSONResponse({"error": "Dịch máy gặp lỗi. Vui lòng thử lại; nếu vẫn lỗi hãy báo quản trị viên."}, status_code=500)
+
+    return JSONResponse({
+        "cv": result.cv,
+        "engine": result.engine,
+        "summary": result.summary(),
+        "items": [i for i in result.items if i["status"] in ("kept", "skipped")],
     })
 
 
@@ -276,6 +333,15 @@ async def build_pdf(request: Request) -> Response:
     project = str(body.get("project") or "")
     position = str(body.get("position") or "")
     lang = str(body.get("lang") or "vi")
+    keep_contact = bool(body.get("keep_contact", False))
+
+    # PDF luôn dựng từ hồ sơ đã dọn + chuẩn hoá (không còn dòng trống); sai cấu trúc thì không dựng
+    cv, structure_errors = pipeline.validate_structure(cv)
+    if structure_errors:
+        return JSONResponse(
+            {"error": "Hồ sơ chưa hợp lệ nên chưa lưu và dựng PDF được: " + "; ".join(structure_errors)},
+            status_code=400,
+        )
 
     run = run_store.get_or_create(run_id) if run_id else RunData(run_id=logging_setup.new_run_id())
     logging_setup.set_run_id(run.run_id)
@@ -290,6 +356,7 @@ async def build_pdf(request: Request) -> Response:
             run.photo,
             on_wait=None,
             lang=lang,
+            keep_contact=keep_contact,
         )
 
     try:
@@ -300,7 +367,7 @@ async def build_pdf(request: Request) -> Response:
         log.exception("Dựng PDF thất bại")
         return JSONResponse({"error": f"Dựng PDF thất bại. {str(e)}"}, status_code=400)
 
-    fingerprint = pipeline.content_fingerprint(cv, project, position, run.photo, lang)
+    fingerprint = pipeline.content_fingerprint(cv, project, position, run.photo, lang, keep_contact=keep_contact)
 
     # Lưu vào run_store
     run.pdf_bytes = pdf_res.pdf_bytes
@@ -338,6 +405,7 @@ async def build_pdf(request: Request) -> Response:
         "page_count": page_count,
         "summary": pdf_res.summary,
         "checklist": pdf_res.checklist,
+        "cv": cv,
         "status": {
             "outdated": status_obj.outdated,
             "pdf_dirty": status_obj.pdf_dirty,

@@ -82,7 +82,14 @@ class RulesExtractor:
             run.detail = f"{sum(len(s.get('jobs', [])) for s in cv['sections'])} công việc"
         with base.stage_run(runs, self.stages[4], progress) as run:
             removed: set[str] = set(ident.removed)
-            notes += personal.scrub_cv(cv, removed)
+            captured: dict[str, list[str]] = {k: list(v) for k, v in ident.contacts.items()}
+            notes += personal.scrub_cv(cv, removed, captured)
+            kept_kinds: set[str] = set()
+            if doc.keep_contact:                                 # người dùng chọn giữ liên hệ: đưa vào dòng thông tin đầu hồ sơ
+                contact_rows, kept_kinds = personal.contact_facts(captured, cv["language"])
+                cv["facts"] = list(cv.get("facts") or []) + contact_rows
+                removed -= kept_kinds
+                self._removed_by_sections -= kept_kinds
             if ident.stats:                                      # CV có sẵn hàng ô số liệu -> giữ nguyên
                 stats, self_created = ident.stats, []
                 conf["stats"] = 0.8
@@ -117,10 +124,58 @@ class RulesExtractor:
             raws = [r for r in raws if r not in dropped]
             other.append(f"CV song ngữ: đã bỏ {len(dropped)} mục tiếng Anh trùng với mục tiếng Việt")
             notes.append(("", "CV song ngữ — hồ sơ chỉ giữ phần tiếng Việt, kiểm tra không sót nội dung"))
+
+        # Chuẩn hoá và gộp mục "Giới thiệu" -> "Mục tiêu nghề nghiệp"
+        target_summary_title = "Career Objective" if lang == "en" else "Mục tiêu nghề nghiệp"
+
+        def _is_summary_raw(r: sections.RawSection) -> bool:
+            norm_t = rulebook.norm(r.title)
+            return r.key == "summary" or any(w in norm_t for w in ("muc tieu", "gioi thieu", "about me", "career objective", "summary", "profile", "tom tat"))
+
+        summary_raw = next((r for r in raws if _is_summary_raw(r)), None)
+
         if ident.intro:
-            raws.insert(0, sections.RawSection("Giới thiệu", "summary", "text", "vi", ident.intro, 0.6,
-                                               "đoạn văn ở đầu CV không có tiêu đề — tiêu đề mục do hệ thống đặt"))
-            self_created.append("Tiêu đề mục \"Giới thiệu\" do hệ thống đặt cho đoạn văn ở đầu CV")
+            if summary_raw:
+                summary_raw.lines = ident.intro + summary_raw.lines
+            else:
+                raws.insert(0, sections.RawSection(target_summary_title, "summary", "text", lang, ident.intro, 0.6,
+                                                   "đoạn văn ở đầu CV không có tiêu đề — tiêu đề mục do hệ thống đặt"))
+                summary_raw = raws[0]
+            self_created.append(f'Tiêu đề mục "{target_summary_title}" do hệ thống đặt cho đoạn văn ở đầu CV')
+
+        # Đổi tất cả tiêu đề mục dạng summary / giới thiệu thành tiêu đề chuẩn
+        for r in raws:
+            if _is_summary_raw(r):
+                r.title = target_summary_title
+                r.key = "summary"
+
+        # Nếu có nhiều hơn 1 mục summary trong raws, gộp các dòng lại vào mục đầu tiên
+        summary_indices = [idx for idx, r in enumerate(raws) if r.key == "summary"]
+        if len(summary_indices) > 1:
+            first_idx = summary_indices[0]
+            for extra_idx in summary_indices[1:]:
+                raws[first_idx].lines.extend(raws[extra_idx].lines)
+            raws = [r for idx, r in enumerate(raws) if idx not in summary_indices[1:]]
+
+        # Sắp xếp raws theo thứ tự chuẩn hoá:
+        # 1. Mục tiêu nghề nghiệp
+        # 2. Kinh nghiệm làm việc
+        # 3. Học vấn
+        # 4. Kĩ năng
+        # 5. Các mục còn lại (giữ nguyên thứ tự tương đối)
+        def _section_priority(r: sections.RawSection) -> int:
+            norm_t = rulebook.norm(r.title)
+            if r.key == "summary" or any(w in norm_t for w in ("muc tieu", "gioi thieu", "about me", "career objective", "summary", "profile", "tom tat")):
+                return 1
+            if r.key in ("experience", "career_path") or r.type in ("experience", "career_path") or any(w in norm_t for w in ("kinh nghiem", "work experience", "employment", "qua trinh lam viec", "lich su lam viec", "lo trinh su nghiep")):
+                return 2
+            if r.key == "education" or r.type == "education" or any(w in norm_t for w in ("hoc van", "education", "trinh do", "dao tao", "bang cap")):
+                return 3
+            if r.key in ("skills", "tools", "competencies", "languages") or any(w in norm_t for w in ("ky nang", "skill", "cong cu", "tool", "nang luc", "ngoai ngu", "language", "tin hoc")):
+                return 4
+            return 5
+
+        raws = sorted(raws, key=_section_priority)
         self._removed_by_sections: set[str] = set()
         built_sections = []
         for r in raws:
@@ -143,7 +198,7 @@ class RulesExtractor:
         if info.get("translated"):
             other.append("CV có bản dịch tiếng Anh theo từng dòng: hồ sơ chỉ giữ phần tiếng Việt")
             notes.append(("", "CV song ngữ theo từng dòng — đã bỏ phần tiếng Anh, kiểm tra không sót nội dung"))
-        if info["two_columns"]:
+        if info.get("two_columns"):
             notes.append(("", "CV dạng 2 cột — thứ tự các mục có thể khác bản gốc, đối chiếu tab CV gốc"))
             other.append("CV dạng 2 cột: đã đọc cột trái trước, cột phải sau")
         if ident.leftover:

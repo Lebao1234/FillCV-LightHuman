@@ -137,3 +137,14 @@ def test_unlabeled_birth_date_keeps_year():
     kept = personal.strip_personal([ln], {id(ln)}, ident)
     assert ident.birth_year == 2001 and "birth" in ident.removed
     assert all("27/04" not in k.text for k in kept)
+
+
+# Kiểm tra bộ nhận diện khuôn mặt đa tầng (frontal + alt2 + profile)
+def test_face_detector_cascades_loaded():
+    from services.pdf import render
+    dets = render._face_detectors()
+    tags = [t[0] for t in dets]
+    assert "frontal_alt2" in tags
+    assert "frontal_default" in tags
+    assert "profile" in tags
+

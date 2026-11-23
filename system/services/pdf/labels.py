@@ -77,7 +77,13 @@ def translate_title(title: str, lang: str) -> str:
     """'KINH NGHIỆM LÀM VIỆC' -> 'WORK EXPERIENCE' (lang='en'). Giữ kiểu IN HOA của tiêu đề gốc."""
     hit = rulebook.match_heading(title)
     names = _labels()["section_titles"].get(hit[0]) if hit else None
-    if not names or lang not in PDF_LANGS or hit[2] == lang:
+    if not names or lang not in PDF_LANGS:
+        return title
+    # Nếu là summary (như Giới thiệu, About me), luôn trả về tiêu đề chuẩn của ngôn ngữ đích
+    if hit[0] == "summary":
+        name = names[_INDEX[lang]]
+        return name.upper() if title.isupper() else name
+    if hit[2] == lang:
         return title
     name = names[_INDEX[lang]]
     return name.upper() if title.isupper() else name

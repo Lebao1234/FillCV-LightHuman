@@ -49,14 +49,16 @@ export async function getConfig() {
  * @param {function(number, string, string[]): void} [callbacks.onProgress] - Khi bắt đầu một bước thật
  * @param {function(object): void} [callbacks.onDone] - Khi trích xuất hoàn thành
  * @param {function(string): void} [callbacks.onError] - Khi gặp lỗi
+ * @param {boolean} [callbacks.keepContact] - Giữ thông tin liên hệ của ứng viên thay vì cắt bỏ
  * @returns {function(): void} Hàm hủy kết nối (abort)
  */
-export function extractCv(file, project, position, { onWait, onProgress, onDone, onError }) {
+export function extractCv(file, project, position, { onWait, onProgress, onDone, onError, keepContact = false }) {
   const controller = new AbortController()
   const formData = new FormData()
   formData.append('file', file)
   if (project) formData.append('project', project)
   if (position) formData.append('position', position)
+  if (keepContact) formData.append('keep_contact', 'true')
 
   ;(async () => {
     try {
@@ -130,21 +132,39 @@ export function extractCv(file, project, position, { onWait, onProgress, onDone,
 }
 
 // Kiểm tra tính hợp lệ cấu trúc và rà soát PII
-export async function validateCv(cv, project = '', position = '', runId = '', lang = 'vi') {
+export async function validateCv(cv, project = '', position = '', runId = '', lang = 'vi', keepContact = false) {
+  const payload = { cv, project, position, run_id: runId, lang }
+  if (keepContact) {
+    payload.keep_contact = true
+  }
   const res = await fetch(`${BASE_URL}/api/cv/validate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ cv, project, position, run_id: runId, lang }),
+    body: JSON.stringify(payload),
+  })
+  return handleJson(res)
+}
+
+// Dịch nội dung hồ sơ tiếng Việt sang tiếng Anh bằng dịch máy offline trên máy chủ
+export async function translateCv(cv, runId = '') {
+  const res = await fetch(`${BASE_URL}/api/cv/translate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cv, run_id: runId }),
   })
   return handleJson(res)
 }
 
 // Dựng PDF từ hồ sơ đang sửa
-export async function buildPdf({ runId, cv, project = '', position = '', lang = 'vi' }) {
+export async function buildPdf({ runId, cv, project = '', position = '', lang = 'vi', keepContact = false }) {
+  const payload = { run_id: runId, cv, project, position, lang }
+  if (keepContact) {
+    payload.keep_contact = true
+  }
   const res = await fetch(`${BASE_URL}/api/pdf/build`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ run_id: runId, cv, project, position, lang }),
+    body: JSON.stringify(payload),
   })
   return handleJson(res)
 }

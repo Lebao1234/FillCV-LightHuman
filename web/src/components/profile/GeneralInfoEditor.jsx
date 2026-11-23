@@ -1,8 +1,7 @@
-import ReviewBadge from './ReviewBadge.jsx'
 
 import Field from '../Field.jsx'
 // Thành phần chỉnh sửa thông tin chung của ứng viên (họ tên, chức danh, năm sinh, giới tính, thông tin nhanh)
-export default function GeneralInfoEditor({ cv, onChange, review }) {
+export default function GeneralInfoEditor({ cv, onChange }) {
   const updateField = (field, value) => {
     onChange({ ...cv, [field]: value })
   }
@@ -26,15 +25,10 @@ export default function GeneralInfoEditor({ cv, onChange, review }) {
     <div className="mb-6">
       <div className="flex items-center mb-3">
         <h4 className="m-0">Thông tin chung</h4>
-        <ReviewBadge
-          review={review}
-          paths={['full_name', 'target_title', 'birth_year', 'gender', 'facts', 'expected_salary']}
-        />
       </div>
 
       <div className="form-row mb-3">
-        <Field label={<>Họ và tên <span className="text-err">*</span>
-            <ReviewBadge review={review} paths="full_name" /></>}>
+        <Field label={<>Họ và tên <span className="text-err">*</span></>}>
 <input
             type="text"
             className="form-input"
@@ -43,8 +37,7 @@ export default function GeneralInfoEditor({ cv, onChange, review }) {
           />
         </Field>
 
-        <Field label={<>Chức danh
-            <ReviewBadge review={review} paths="target_title" /></>}>
+        <Field label={<>Chức danh</>}>
 <input
             type="text"
             className="form-input"
@@ -55,8 +48,7 @@ export default function GeneralInfoEditor({ cv, onChange, review }) {
       </div>
 
       <div className="form-row mb-3">
-        <Field label={<>Năm sinh
-            <ReviewBadge review={review} paths="birth_year" /></>}>
+        <Field label={<>Năm sinh</>}>
 <input
             type="number"
             className="form-input"
@@ -65,8 +57,7 @@ export default function GeneralInfoEditor({ cv, onChange, review }) {
           />
         </Field>
 
-        <Field label={<>Giới tính
-            <ReviewBadge review={review} paths="gender" /></>}>
+        <Field label={<>Giới tính</>}>
 <input
             type="text"
             className="form-input"

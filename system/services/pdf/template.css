@@ -4,14 +4,18 @@
    - body.compact : bản cỡ chữ nhỏ, thu gọn khoảng cách (render.FONT_SIZE_ATTEMPTS)
    - --stats-cols : số cột hàng ô số liệu (= số ô) */
 
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
+  font-family: inherit;
 }
 
 html,
 body {
   margin: 0;
   padding: 0;
+  font-family: "Times New Roman", "Liberation Serif", Times, serif;
 }
 
 body {
@@ -28,14 +32,23 @@ body {
   border-bottom: 2pt solid var(--navy);
 }
 
-.brand img {
-  height: 15mm;
+.brand {
+  gap: 6mm;
 }
 
+.brand img {
+  height: 15mm;
+  flex: none;
+}
+
+/* Khối bên phải co giãn được: địa chỉ dài tự xuống dòng thay vì đẩy sát logo */
 .brand .right {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 5mm;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .brand .co {
@@ -43,13 +56,33 @@ body {
   line-height: 1.55;
   padding-right: 5mm;
   border-right: 0.8pt solid var(--line);
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.brand .doc {
+  flex: none;
+}
+
+/* Mỗi dòng thông tin = nhãn cố định + nội dung; dòng dài xuống hàng thẳng cột với nội dung, không chui xuống dưới nhãn */
+.brand .co {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 2.5mm;
+  align-items: baseline;
+}
+
+.brand .co .row {
+  display: contents;
 }
 
 .brand .co .lbl {
   color: var(--navy);
   font-weight: bold;
-  display: inline-block;
-  width: 16mm;
+}
+
+.brand .co .val {
+  min-width: 0;
 }
 
 .brand .doc {

@@ -1,4 +1,4 @@
-﻿# Gói services/privacy/: lọc thông tin nhạy cảm của ứng viên + checklist PDF thành phẩm.
+# Gói services/privacy/: lọc thông tin nhạy cảm của ứng viên + checklist PDF thành phẩm.
 """Bước 3: kiểm tra bảo mật và chất lượng (checklist mục 7 SKILL.md).
 
 - scan_pii(cv)       : quét JSON trước khi xuất -> có vi phạm thì CHẶN xuất PDF.
@@ -33,6 +33,40 @@ def _allowed_domains() -> tuple[str, ...]:
 # A8: một danh sách mạng xã hội dùng cho cả mẫu "Mạng xã hội" lẫn SOCIAL_LABEL bên dưới
 SOCIAL_NETWORKS = ("linkedin", "facebook", "fb", "zalo", "behance", "github", "instagram", "tiktok", "skype", "telegram")
 _SOCIAL_RE = "|".join(SOCIAL_NETWORKS)
+
+# Danh sách các loại thông tin thuộc nhóm liên hệ (Contact)
+CONTACT_KINDS = {"Số điện thoại", "Email", "Đường link", "Mạng xã hội"}
+
+
+# Hàm kiểm tra điều kiện lựa chọn giữa giữ contact vào template và cắt contact như cũ
+def is_contact_allowed(kind: str, keep_contact: bool = False) -> bool:
+    """Hàm if lựa chọn giữa giữ contact vào template và cắt contact như cũ.
+
+    - Nếu keep_contact=True: giữ nguyên contact vào template, không coi loại thông tin liên hệ là vi phạm PII.
+    - Nếu keep_contact=False (mặc định): cắt contact như cũ, coi toàn bộ thông tin liên hệ là vi phạm PII.
+    """
+    if keep_contact:
+        # Lựa chọn giữ contact vào template
+        if kind in CONTACT_KINDS:
+            return True
+        return False
+    else:
+        # Lựa chọn cắt contact như cũ
+        return False
+
+
+# Hàm lọc danh sách vi phạm PII theo lựa chọn giữ contact
+def filter_contact_violations(violations: list, keep_contact: bool = False) -> list:
+    """Lọc danh sách vi phạm dựa trên lựa chọn giữ contact vào template hay cắt contact như cũ."""
+    if keep_contact:
+        filtered = []
+        for v in violations:
+            k = v.get("kind") if isinstance(v, dict) else v[0]
+            if k not in CONTACT_KINDS:
+                filtered.append(v)
+        return filtered
+    else:
+        return violations
 
 PATTERNS = {
     # Đầu số: "(+84)", "(028)", "+84", "84", "0". Đầu số không nằm giữa một chuỗi khác
@@ -120,10 +154,18 @@ def _is_birth_date(text: str, m: re.Match) -> bool:
 
 
 # Tìm thông tin nhạy cảm trong một chuỗi
-def scan_text(text: str) -> list[tuple[str, str]]:
-    """Tìm thông tin nhạy cảm trong 1 chuỗi. Trả [(loại, giá trị)]."""
+def scan_text(text: str, keep_contact: bool = False) -> list[tuple[str, str]]:
+    """Tìm thông tin nhạy cảm trong 1 chuỗi. Trả [(loại, giá trị)].
+
+    Tham số `keep_contact`:
+      - False (mặc định): Cắt contact như cũ, báo vi phạm nếu thấy SĐT/Email/Link/MXH.
+      - True: Giữ contact vào template, không báo vi phạm với các thông tin liên hệ.
+    """
     result = []
     for kind, pattern in PATTERNS.items():
+        # Lựa chọn giữa giữ contact vào template và cắt contact như cũ
+        if is_contact_allowed(kind, keep_contact):
+            continue
         for m in pattern.finditer(text or ""):
             if kind == "Ngày sinh đầy đủ" and not _is_birth_date(text, m):
                 continue
@@ -133,7 +175,7 @@ def scan_text(text: str) -> list[tuple[str, str]]:
 
 
 # Quét mọi chuỗi trong JSON hồ sơ
-def scan_pii(data, path: str = "") -> list[dict]:
+def scan_pii(data, path: str = "", keep_contact: bool = False) -> list[dict]:
     """Duyệt TOÀN BỘ chuỗi trong JSON. Trả [{field, loai, value}]."""
     errors = []
     if isinstance(data, dict):
@@ -141,25 +183,25 @@ def scan_pii(data, path: str = "") -> list[dict]:
             if not path and k in SKIP_FIELDS:
                 continue
             # Nhãn dạng "Zalo" / "Facebook" + nội dung ở trường bên cạnh = thông tin liên hệ
-            if k == "label" and isinstance(v, str) and SOCIAL_LABEL.fullmatch(v.strip()):
+            if not keep_contact and k == "label" and isinstance(v, str) and SOCIAL_LABEL.fullmatch(v.strip()):
                 errors.append({"field": f"{path}.{k}" if path else k,
                             "kind": "Mạng xã hội", "value": v.strip()})
-            errors += scan_pii(v, f"{path}.{k}" if path else k)
+            errors += scan_pii(v, f"{path}.{k}" if path else k, keep_contact=keep_contact)
     elif isinstance(data, list):
         for i, v in enumerate(data):
-            errors += scan_pii(v, f"{path}[{i}]")
+            errors += scan_pii(v, f"{path}[{i}]", keep_contact=keep_contact)
     elif isinstance(data, str):
-        for kind, found in scan_text(data):
+        for kind, found in scan_text(data, keep_contact=keep_contact):
             errors.append({"field": path, "kind": kind, "value": found})
     return errors
 
 
 # Quét hồ sơ + dự án + vị trí trước khi xuất
-def scan_pii_export(cv: dict, project: str, position: str) -> list[dict]:
+def scan_pii_export(cv: dict, project: str, position: str, keep_contact: bool = False) -> list[dict]:
     """Quét mọi chữ sẽ vào PDF: hồ sơ + tên dự án (header) + vị trí (header, tên file)."""
-    errors = scan_pii(cv)
+    errors = scan_pii(cv, keep_contact=keep_contact)
     for name, value in (("Tên dự án", project), ("Vị trí", position)):
-        for kind, found in scan_text(value or ""):
+        for kind, found in scan_text(value or "", keep_contact=keep_contact):
             errors.append({"field": name, "kind": kind, "value": found})
     return errors
 
@@ -199,7 +241,7 @@ def check_fonts(fonts: list[tuple]) -> dict:
 
 
 # Checklist chất lượng cho PDF thành phẩm
-def scan_pdf(pdf_path: Path, lang: str = "vi") -> list[dict]:
+def scan_pdf(pdf_path: Path, lang: str = "vi", keep_contact: bool = False) -> list[dict]:
     """Checklist cho PDF thành phẩm xuất bằng ngôn ngữ `lang`. Trả [{code, item, ok, detail}]."""
     import pymupdf as fitz
     from services.pdf import labels
@@ -212,11 +254,15 @@ def scan_pdf(pdf_path: Path, lang: str = "vi") -> list[dict]:
         # 1. Font serif đã nhúng
         result.append(check_fonts([f for p in doc for f in p.get_fonts()]))
 
-        # 2. Không còn thông tin liên hệ của ứng viên
-        violations = scan_text(text)
-        result.append({"code": "pii", "item": "Không còn SĐT, email, link, ngày sinh của ứng viên",
+        # 2. Không còn thông tin liên hệ của ứng viên (hoặc giữ nếu keep_contact=True)
+        violations = scan_text(text, keep_contact=keep_contact)
+        if keep_contact:
+            item_desc = "Cho phép thông tin liên hệ (chế độ giữ contact)"
+        else:
+            item_desc = "Không còn SĐT, email, link, ngày sinh của ứng viên"
+        result.append({"code": "pii", "item": item_desc,
                    "ok": not violations,
-                   "detail": "; ".join(f"{l}: {g}" for l, g in violations) or "Sạch"})
+                   "detail": "; ".join(f"{kind}: {val}" for kind, val in violations) or "Sạch"})
 
         # 3. Header đúng chuẩn: tiêu đề của ngôn ngữ xuất, không lẫn tiêu đề của ngôn ngữ kia (mục 3.1 SKILL.md)
         want = labels.texts(lang)["doc_title"]

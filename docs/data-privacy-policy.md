@@ -29,6 +29,10 @@ liên hệ của ứng viên (quét cả dữ liệu lẫn chính file PDF), Chr
 
 - Từ 11/2026 công cụ **đã gỡ OpenAI**: CV được đọc bằng bộ trích xuất chạy trên chính máy chủ của app, không gọi
   dịch vụ AI hay API bên ngoài (`services/extraction/`).
+- **Dịch sang tiếng Anh** dùng dịch máy **offline** (CTranslate2 + Opus-MT) chạy ngay trên máy chủ: nội dung CV không gửi
+  đi đâu, mô hình chỉ là file nằm trong `data/models/`. Họ tên, công ty, trường, thẻ kỹ năng, thời gian, số liệu không đưa
+  vào dịch máy; bản dịch chỉ là bản nháp, nhân viên phải đọc lại; log không ghi nội dung đoạn dịch
+  (`services/translation/`, `docs/dich-may-offline.md`).
 - CV đã gửi tới OpenAI **trước thời điểm này** vẫn chịu điều khoản lưu trữ của OpenAI lúc đó [cần xác minh: thời hạn
   lưu phía OpenAI, có cần yêu cầu xoá không].
 

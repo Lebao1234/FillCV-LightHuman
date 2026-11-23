@@ -2,7 +2,7 @@ import { useState } from 'react'
 import PortraitEditor from './PortraitEditor.jsx'
 import GeneralInfoEditor from './GeneralInfoEditor.jsx'
 import StatsEditor from './StatsEditor.jsx'
-import ReviewBadge from './ReviewBadge.jsx'
+import TranslatePanel from './TranslatePanel.jsx'
 import {
   TextSection,
   BulletsSection,
@@ -48,7 +48,20 @@ export default function ProfileForm({
   runId,
   photoUrl,
   onChangePhoto,
-  review,
+  isDirty = false,
+  isSaving = false,
+  savedAt = null,
+  saveError = null,
+  structureErrors = [],
+  violations = [],
+  onSave,
+  onRevert,
+  onViewPdf,
+  translationAvailable = false,
+  isTranslating = false,
+  translateReport = null,
+  translateError = null,
+  onTranslate,
 }) {
   const [openSections, setOpenSections] = useState({})
   const [newType, setNewType] = useState('experience')
@@ -98,6 +111,49 @@ export default function ProfileForm({
 
   return (
     <div className="bg-white p-4 border border-line rounded-md">
+      {/* Lỗi cần sửa trước khi lưu: hiện ngay tại tab này, không phải sang tab PDF mới thấy */}
+      {structureErrors.length > 0 && (
+        <div className="lh-alert err" role="alert">
+          <div className="t">Hồ sơ chưa hợp lệ — sửa các chỗ sau rồi mới lưu được</div>
+          <ul>
+            {structureErrors.map((err, i) => (
+              <li key={i}>{err}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {violations.length > 0 && (
+        <div className="lh-alert err" role="alert">
+          <div className="t">Còn thông tin nhạy cảm — phải sửa trước khi tải PDF</div>
+          <ul>
+            {violations.map((v, i) => (
+              <li key={i}>
+                {v.kind} <code>{v.value}</code> tại <code>{v.field}</code>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {saveError && (
+        <div className="lh-alert err" role="alert">
+          <div className="t">Chưa lưu được</div>
+          <ul>
+            <li>{saveError}</li>
+          </ul>
+        </div>
+      )}
+
+      {/* Dịch sang tiếng Anh (chỉ hiện khi máy chủ đã bật dịch máy) */}
+      <TranslatePanel
+        available={translationAvailable}
+        isTranslating={isTranslating}
+        report={translateReport}
+        error={translateError}
+        onTranslate={onTranslate}
+      />
+
       {/* Dự án và Vị trí */}
       <div className="form-row mb-4">
         <Field label="Tên dự án">
@@ -124,10 +180,10 @@ export default function ProfileForm({
       <PortraitEditor runId={runId} photoUrl={photoUrl} onPhotoChange={onChangePhoto} />
 
       {/* Thông tin chung */}
-      <GeneralInfoEditor cv={cv} onChange={onChangeCv} review={review} />
+      <GeneralInfoEditor cv={cv} onChange={onChangeCv} />
 
       {/* Hàng ô số liệu */}
-      <StatsEditor cv={cv} onChange={onChangeCv} review={review} />
+      <StatsEditor cv={cv} onChange={onChangeCv} />
 
       {/* Danh sách các mục nội dung */}
       <div className="mt-6">
@@ -168,7 +224,6 @@ export default function ProfileForm({
                     {idx + 1}. {sec.title || '(Chưa có tiêu đề)'}
                   </span>
                   <span className="text-xs text-faint">({sec.type})</span>
-                  <ReviewBadge review={review} paths={`sections[${idx}]`} />
                 </div>
 
                 <div className="flex gap-1 items-center"
@@ -228,7 +283,44 @@ export default function ProfileForm({
           )
         })}
       </div>
+
+      {/* Thanh lưu: luôn nằm sát đáy màn hình khi cuộn form dài */}
+      <div className="sticky bottom-0 -mx-4 -mb-4 mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line bg-white px-4 py-3">
+        <div role="status" aria-live="polite" className="text-sm">
+          {isSaving ? (
+            <span className="text-muted">Đang lưu và dựng lại PDF...</span>
+          ) : isDirty ? (
+            <span className="font-semibold text-warn">Có thay đổi chưa lưu</span>
+          ) : savedAt ? (
+            <span className="font-semibold text-ok">
+              Đã lưu lúc {savedAt.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} · PDF đã cập nhật
+            </span>
+          ) : (
+            <span className="text-muted">Chưa có thay đổi</span>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {onRevert && (
+            <button type="button" className="btn btn-tertiary text-sm" onClick={onRevert} disabled={isSaving}>
+              Về bản đọc ban đầu
+            </button>
+          )}
+          {onViewPdf && !isDirty && !isSaving && (
+            <button type="button" className="btn btn-secondary text-sm" onClick={onViewPdf}>
+              Xem bản PDF
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn btn-primary text-sm"
+            onClick={onSave}
+            disabled={!isDirty || isSaving || structureErrors.length > 0}
+          >
+            {isSaving ? 'Đang lưu...' : 'Lưu & cập nhật PDF'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
-

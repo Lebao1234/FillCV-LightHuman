@@ -16,6 +16,9 @@ export default function PdfPanel({
   setReviewed,
   pdfLang,
   onChangeLang,
+  keepContact = false,
+  contactMissing = false,
+  onChangeKeepContact,
 }) {
   const [showChecklist, setShowChecklist] = useState(false)
   const checklistId = useId()
@@ -135,6 +138,23 @@ export default function PdfPanel({
             />
             English
           </label>
+        </div>
+
+        <div className="contact-options">
+          <label className="inline-flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="checkbox"
+              name="keep_contact"
+              checked={keepContact}
+              onChange={(e) => onChangeKeepContact && onChangeKeepContact(e.target.checked)}
+            />
+            <span>{keepContact ? 'Giữ nguyên liên hệ (không cắt contact)' : 'Cắt bỏ toàn bộ contact'}</span>
+          </label>
+          {keepContact && contactMissing && (
+            <p className="m-0 mt-1 text-xs text-warn" role="note">
+              Hồ sơ này đã được đọc ở chế độ cắt liên hệ nên chưa có SĐT/email để giữ. Hãy nạp lại CV và chọn &quot;Giữ nguyên liên hệ&quot; ở form tải lên.
+            </p>
+          )}
         </div>
 
         <button

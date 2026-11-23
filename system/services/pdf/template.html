@@ -122,10 +122,10 @@
   <div class="right">
     <div class="co">
       {#- A4: thông tin công ty từ config/company.toml (cùng nguồn với bộ lọc PII trong checks.py) #}
-      <span class="lbl">{{ t.address }}:</span> {{ company_info.address }}<br>
-      <span class="lbl">{{ t.phone }}:</span> {{ company_info.phone }}<br>
-      <span class="lbl">{{ t.email }}:</span> {{ company_info.email }}<br>
-      <span class="lbl">{{ t.website }}:</span> {{ company_info.website }}
+      <div class="row"><span class="lbl">{{ t.address }}:</span><span class="val">{{ company_info.address }}</span></div>
+      <div class="row"><span class="lbl">{{ t.phone }}:</span><span class="val">{{ company_info.phone }}</span></div>
+      <div class="row"><span class="lbl">{{ t.email }}:</span><span class="val">{{ company_info.email }}</span></div>
+      <div class="row"><span class="lbl">{{ t.website }}:</span><span class="val">{{ company_info.website }}</span></div>
     </div>
     <div class="doc">
       <b>{{ t.doc_title }}</b>

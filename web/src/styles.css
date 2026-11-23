@@ -595,7 +595,8 @@ body {
   margin: var(--sp-3) 0;
 }
 
-.lang-options {
+.lang-options,
+.contact-options {
   display: flex;
   flex-wrap: wrap;
   gap: var(--sp-3);
@@ -603,7 +604,8 @@ body {
   font-size: var(--fs-sm);
 }
 
-.lang-options label {
+.lang-options label,
+.contact-options label {
   white-space: nowrap;
   display: flex;
   align-items: center;
@@ -803,22 +805,12 @@ body {
 }
 
 /* Khung tóm tắt */
-/* Cần xem badge */
-.badge-review {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1);
-  padding: var(--sp-1) var(--sp-2);
-  border-radius: var(--r-sm);
-  background: var(--warn-bg);
-  border: 1px solid var(--warn-line);
-  color: var(--warn);
-  font-size: var(--fs-xs);
-  font-weight: 500;
-  margin-left: var(--sp-2);
+/* Keyframes */
+@keyframes lhSlide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
 }
 
-/* Keyframes */
 @keyframes lhIn {
   from {
     opacity: 0;

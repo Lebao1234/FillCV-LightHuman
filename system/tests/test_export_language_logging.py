@@ -140,3 +140,37 @@ def test_build_pdf_checklist_passes(tmp_path, cv, lang, title):
     assert all(r["ok"] for r in result), [r for r in result if not r["ok"]]
     assert title in next(r["item"] for r in result if r["code"] == "header")
     assert pdf.name.endswith(" - EN.pdf") == (lang == "en")
+
+
+# clean_cv: dọn dòng trống, khoảng trắng và hàng rỗng nhưng giữ nguyên nội dung thật
+def test_clean_cv_drops_blank_lines_and_empty_rows():
+    cv = {
+        "language": "vi", "full_name": " A ", "target_title": "  ", "birth_year": None, "gender": " Nam ",
+        "facts": [{"label": "X", "value": " "}, {"label": " Mong muốn ", "value": " KT "}],
+        "expected_salary": "", "stats": [{"value": "", "label": "", "source": "original"},
+                                          {"value": " 5+ ", "label": "năm", "source": "original"}],
+        "sections": [{
+            "type": "experience", "title": " KN ", "paragraphs": [], "bullets": [], "cards": [], "tags": [],
+            "career_path": [], "education": [], "references": [],
+            "jobs": [
+                {"company": "", "period": " ", "role": None, "meta": [], "groups": [{"title": " ", "bullets": ["", " "]}], "sub_roles": []},
+                {"company": " Cty ", "period": "", "role": " GĐ ", "meta": [{"label": " ", "text": " Quy mô "}, {"label": "k", "text": ""}],
+                 "groups": [{"title": None, "bullets": ["a", "", " b "]}], "sub_roles": []},
+            ],
+        }],
+        "model_notes": {"removed": [], "self_created": [], "recruiting_flags": [], "other": []},
+    }
+    out = pipeline.clean_cv(cv)
+    assert out["full_name"] == "A" and out["target_title"] is None and out["gender"] == "Nam"
+    assert out["facts"] == [{"label": "Mong muốn", "value": "KT"}]
+    assert out["stats"] == [{"value": "5+", "label": "năm", "source": "original"}]
+    jobs = out["sections"][0]["jobs"]
+    assert len(jobs) == 1  # công việc hoàn toàn trống bị bỏ
+    assert jobs[0]["company"] == "Cty" and jobs[0]["role"] == "GĐ" and jobs[0]["period"] is None
+    assert jobs[0]["meta"] == [{"label": None, "text": "Quy mô"}]
+    assert jobs[0]["groups"] == [{"title": None, "bullets": ["a", "b"]}]
+    # Không sửa hồ sơ gốc truyền vào
+    assert cv["sections"][0]["jobs"][1]["groups"][0]["bullets"] == ["a", "", " b "]
+    # Sau khi dọn thì qua được schema
+    normalized, errors = pipeline.validate_structure(cv)
+    assert errors == [] and normalized["full_name"] == "A"

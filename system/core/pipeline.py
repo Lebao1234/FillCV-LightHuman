@@ -101,8 +101,8 @@ def _take_extract_slot(on_wait: Callable[[int], None] | None) -> None:
 # Đọc CV qua bộ trích xuất đang cấu hình + lấy ảnh chân dung
 def read_cv(data: bytes, filename: str, project: str, position: str,
             on_progress: Callable[[int], None] | None = None,
-            on_wait: Callable[[int], None] | None = None) -> ReadResult:
-    """Đọc CV + lấy ảnh chân dung. Mọi lỗi -> CVReadError có câu thông báo dễ hiểu (không để traceback lọt ra).
+            on_wait: Callable[[int], None] | None = None, keep_contact: bool = False) -> ReadResult:
+    """Đọc CV + lấy ảnh chân dung. `keep_contact`: giữ thông tin liên hệ của ứng viên (SĐT, email, địa chỉ, link) thay vì cắt bỏ. Mọi lỗi -> CVReadError có câu thông báo dễ hiểu (không để traceback lọt ra).
 
     `on_progress(i)`: gọi khi BẮT ĐẦU bước thứ i trong stage_labels() -> màn hình chờ chỉ hiện bước đang chạy thật.
     `on_wait(n)`: đang xếp hàng chờ tới lượt đọc (vị trí n) — tối đa EXTRACT_MAX_CONCURRENT lượt đọc cùng lúc
@@ -114,7 +114,7 @@ def read_cv(data: bytes, filename: str, project: str, position: str,
         extractor = extraction.get_extractor()
         keys = [s.key for s in extractor.stages]
         report = (lambda key: on_progress(keys.index(key))) if on_progress else None
-        doc = extraction.SourceDoc(data, filename, project, position, render.today_vn())
+        doc = extraction.SourceDoc(data, filename, project, position, render.today_vn(), keep_contact=keep_contact)
         _take_extract_slot(on_wait)
         try:
             res = extractor.extract(doc, report)
@@ -164,12 +164,14 @@ def queue_length() -> int:
 
 # Dựng PDF (qua hàng đợi dùng chung) + checklist + tóm tắt
 def make_pdf(cv: dict, project: str, position: str, photo: bytes | None,
-             on_wait: Callable[[int], None] | None = None, lang: str = "vi") -> PdfResult:
+             on_wait: Callable[[int], None] | None = None, lang: str = "vi",
+             keep_contact: bool = False) -> PdfResult:
     """Dựng PDF vào thư mục tạm + checklist + tin nhắn tóm tắt. Lỗi -> ném ra (app ghi log và báo).
 
     Tối đa RENDER_MAX_CONCURRENT lượt dựng chạy cùng lúc trên toàn app; người tới sau xếp hàng.
     Phải chờ thì gọi `on_wait(queue_pos)` trước để giao diện báo "đang xếp hàng".
     `lang`: ngôn ngữ xuất PDF ('vi' | 'en') — nhãn cố định, tiêu đề mục chuẩn, tên file, checklist header.
+    `keep_contact`: tuỳ chọn giữ nguyên thông tin liên hệ (True) hoặc cắt bỏ PII liên hệ như cũ (False).
     """
     global _queue_length
     if not _render_slots.acquire(blocking=False):
@@ -189,7 +191,7 @@ def make_pdf(cv: dict, project: str, position: str, photo: bytes | None,
     try:
         with tempfile.TemporaryDirectory() as tmp:
             p = render.build_pdf(cv, project, position, photo, Path(tmp), lang=lang)
-            checklist = checks.scan_pdf(p, lang=lang)
+            checklist = checks.scan_pdf(p, lang=lang, keep_contact=keep_contact)
             result = PdfResult(p.read_bytes(), p.name, checklist, summary_message(cv, project, position), lang)
     finally:
         _render_slots.release()
@@ -259,11 +261,126 @@ def is_truthy(v) -> bool:
     return v is True or str(v or "").strip().lower() in {"x", "có", "co", "yes", "true", "1"}
 
 
+# Cắt khoảng trắng hai đầu của một chuỗi (giá trị khác kiểu giữ nguyên)
+def _strip(v):
+    return v.strip() if isinstance(v, str) else v
+
+
+# Chuỗi tuỳ chọn: rỗng sau khi cắt -> None
+def _opt(v):
+    v = _strip(v)
+    return v if v != "" else None
+
+
+# Danh sách chuỗi: cắt khoảng trắng và bỏ dòng trống (không phải danh sách thì giữ nguyên để schema báo lỗi)
+def _clean_lines(items):
+    if not isinstance(items, list):
+        return items
+    return [s for s in (_strip(x) for x in items) if s != ""]
+
+
+# Danh sách dòng phụ (nhãn + nội dung): bỏ dòng không có nội dung
+def _clean_meta(items):
+    if not isinstance(items, list):
+        return items
+    rows = [{**m, "label": _opt(m.get("label")), "text": _strip(m.get("text", ""))} for m in items if isinstance(m, dict)]
+    return [m for m in rows if m["text"] != ""]
+
+
+# Danh sách nhóm việc: bỏ nhóm không có tiêu đề lẫn gạch đầu dòng
+def _clean_groups(items):
+    if not isinstance(items, list):
+        return items
+    rows = [{**g, "title": _opt(g.get("title")), "bullets": _clean_lines(g.get("bullets", []))} for g in items if isinstance(g, dict)]
+    return [g for g in rows if g["title"] is not None or g["bullets"]]
+
+
+# Dọn một công việc; trả None nếu công việc hoàn toàn trống
+def _clean_job(job):
+    if not isinstance(job, dict):
+        return job
+    subs = []
+    for s in job.get("sub_roles") or []:
+        if not isinstance(s, dict):
+            continue
+        s = {**s, "name": _strip(s.get("name", "")), "period": _opt(s.get("period")),
+             "meta": _clean_meta(s.get("meta", [])), "groups": _clean_groups(s.get("groups", []))}
+        if s["name"] != "" or s["meta"] or s["groups"]:
+            subs.append(s)
+    j = {**job, "company": _strip(job.get("company", "")), "period": _opt(job.get("period")), "role": _opt(job.get("role")),
+         "meta": _clean_meta(job.get("meta", [])), "groups": _clean_groups(job.get("groups", [])), "sub_roles": subs}
+    empty = j["company"] == "" and j["period"] is None and j["role"] is None and not (j["meta"] or j["groups"] or subs)
+    return None if empty else j
+
+
+# Dọn các dòng của mục dạng bảng: cắt khoảng trắng các trường, bỏ dòng trống hoàn toàn
+def _clean_rows(items, required: tuple[str, ...], optional: tuple[str, ...] = ()):
+    if not isinstance(items, list):
+        return items
+    rows = []
+    for r in items:
+        if not isinstance(r, dict):
+            continue
+        r = {**r, **{k: _strip(r.get(k, "")) for k in required}, **{k: _opt(r.get(k)) for k in optional}}
+        if any(r[k] not in ("", None) for k in required + optional):
+            rows.append(r)
+    return rows
+
+
+# Dọn một mục nội dung theo từng loại
+def _clean_section(sec):
+    if not isinstance(sec, dict):
+        return sec
+    cards = [{**c, "title": _strip(c.get("title", "")), "items": _clean_lines(c.get("items", []))}
+             for c in (sec.get("cards") or []) if isinstance(c, dict)]
+    jobs = [j for j in (_clean_job(j) for j in (sec.get("jobs") or [])) if j is not None]
+    return {
+        **sec,
+        "title": _strip(sec.get("title", "")),
+        "paragraphs": _clean_lines(sec.get("paragraphs", [])),
+        "bullets": _clean_lines(sec.get("bullets", [])),
+        "tags": _clean_lines(sec.get("tags", [])),
+        "cards": [c for c in cards if c["title"] != "" or c["items"]],
+        "career_path": _clean_rows(sec.get("career_path", []), ("period", "title", "company")),
+        "education": _clean_rows(sec.get("education", []), ("title",), ("detail", "period")),
+        "references": _clean_rows(sec.get("references", []), ("name",), ("title", "company")),
+        "jobs": jobs,
+    }
+
+
+# Dọn hồ sơ trước khi kiểm tra/dựng PDF
+def clean_cv(cv: dict) -> dict:
+    """Dọn hồ sơ người dùng vừa sửa tay: cắt khoảng trắng, bỏ dòng/hàng/ô trống.
+
+    Ô nhập nhiều dòng (gạch đầu dòng, thẻ...) rất dễ để lại dòng trống -> nếu không dọn, template dựng ra
+    gạch đầu dòng rỗng. Không đổi thứ tự, không thêm nội dung; không phải dict thì giữ nguyên để schema báo lỗi.
+    """
+    if not isinstance(cv, dict):
+        return cv
+    out = dict(cv)
+    if "full_name" in out:
+        out["full_name"] = _strip(out["full_name"])
+    for key in ("target_title", "gender", "expected_salary"):
+        if key in out:
+            out[key] = _opt(out[key])
+    if isinstance(out.get("facts"), list):
+        facts = [{**f, "label": _strip(f.get("label", "")), "value": _strip(f.get("value", ""))}
+                 for f in out["facts"] if isinstance(f, dict)]
+        out["facts"] = [f for f in facts if f["value"] != ""]
+    if isinstance(out.get("stats"), list):
+        stats = [{**s, "value": _strip(s.get("value", "")), "label": _strip(s.get("label", ""))}
+                 for s in out["stats"] if isinstance(s, dict)]
+        out["stats"] = [s for s in stats if s["value"] != "" or s["label"] != ""]
+    if isinstance(out.get("sections"), list):
+        out["sections"] = [_clean_section(s) for s in out["sections"]]
+    return out
+
+
 # Kiểm tra hồ sơ đã sửa theo CVData
 def validate_structure(cv: dict) -> tuple[dict | None, list[str]]:
-    """Kiểm tra lại hồ sơ đã sửa bằng CVData. Trả (hồ sơ chuẩn hoá | None, danh sách lỗi)."""
+    """Dọn (clean_cv) rồi kiểm tra lại hồ sơ đã sửa bằng CVData. Trả (hồ sơ chuẩn hoá | None, danh sách lỗi)."""
     try:
-        return CVData.model_validate(cv).model_dump(), []
+        return CVData.model_validate(clean_cv(cv)).model_dump(), []
     except ValidationError as e:
         errors = []
         for err in e.errors():
@@ -273,9 +390,10 @@ def validate_structure(cv: dict) -> tuple[dict | None, list[str]]:
 
 
 # Mã băm nội dung để biết PDF còn khớp không
-def content_fingerprint(cv: dict, project: str, position: str, photo: bytes | None, lang: str = "vi") -> str:
-    """Mã nhận diện nội dung đầu vào của PDF (cả ngôn ngữ xuất) -> biết PDF đã xuất còn khớp màn hình không."""
-    payload = json.dumps([cv, project, position, lang], ensure_ascii=False, sort_keys=True).encode("utf-8")
+def content_fingerprint(cv: dict, project: str, position: str, photo: bytes | None, lang: str = "vi",
+                        keep_contact: bool = False) -> str:
+    """Mã nhận diện nội dung đầu vào của PDF (cả ngôn ngữ xuất và tuỳ chọn liên hệ) -> biết PDF đã xuất còn khớp màn hình không."""
+    payload = json.dumps([cv, project, position, lang, keep_contact], ensure_ascii=False, sort_keys=True).encode("utf-8")
     return hashlib.sha256(payload + (photo or b"")).hexdigest()
 
 

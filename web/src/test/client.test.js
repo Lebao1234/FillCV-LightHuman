@@ -1,6 +1,7 @@
 // Kiểm thử module API client kết nối backend
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
+  extractCv,
   getConfig,
   validateCv,
   buildPdf,
@@ -15,6 +16,23 @@ describe('API Client Module', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
+  })
+
+  // Lựa chọn giữ liên hệ phải được gửi cùng file lúc bóc tách (nếu không bộ đọc luôn cắt liên hệ)
+  it('extractCv gửi keep_contact khi chọn giữ liên hệ, không gửi khi không chọn', async () => {
+    const sent = []
+    const fetchMock = vi.fn().mockImplementation((url, opts) => {
+      sent.push(opts.body)
+      return Promise.resolve({ ok: false, json: async () => ({ error: 'x' }) })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const file = new File(['x'], 'a.pdf', { type: 'application/pdf' })
+    const noop = () => {}
+    extractCv(file, '', '', { keepContact: true, onError: noop })
+    extractCv(file, '', '', { onError: noop })
+    await new Promise((r) => setTimeout(r, 0))
+    expect(sent[0].get('keep_contact')).toBe('true')
+    expect(sent[1].has('keep_contact')).toBe(false)
   })
 
   // Kiểm tra lấy cấu hình hệ thống

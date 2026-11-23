@@ -39,7 +39,13 @@ Mọi endpoint đều tuân thủ các quy tắc bảo mật từ [CLAUDE.md](fi
     "Đọc CV gốc",
     "Lấy ảnh chân dung từ CV gốc",
     "Kiểm tra thông tin nhạy cảm, dựng PDF và checklist chất lượng"
-  ]
+  ],
+  "translation": {
+    "available": true,
+    "source": "vi",
+    "target": "en",
+    "engine": "opus-mt-vi-en"
+  }
 }
 ```
 
@@ -55,6 +61,7 @@ Mọi endpoint đều tuân thủ các quy tắc bảo mật từ [CLAUDE.md](fi
   * `file`: File nhị phân (bắt buộc, <= `max_upload_mb`).
   * `project`: Chuỗi (không bắt buộc, tên dự án).
   * `position`: Chuỗi (không bắt buộc, vị trí ứng tuyển).
+  * `keep_contact`: `"true"` (không bắt buộc, mặc định cắt bỏ): giữ SĐT/email/địa chỉ/link của ứng viên và đưa vào `facts` (nhãn "Điện thoại", "Email", "Địa chỉ", "Website", "Mạng xã hội"; tiếng Anh: "Phone", "Address"...) thay vì cắt bỏ. Các loại đã giữ không còn nằm trong `model_notes.removed`.
 * **Accept:** `text/event-stream` (mặc định cho web client) hoặc `application/json`.
 * **Response Stream (`text/event-stream`):**
   * *Khi phải xếp hàng:*
@@ -115,7 +122,7 @@ Mọi endpoint đều tuân thủ các quy tắc bảo mật từ [CLAUDE.md](fi
 
 ### 3.1. Xác thực cấu trúc hồ sơ và thông tin nhạy cảm
 * **Endpoint:** `POST /api/cv/validate`
-* **Mô tả:** Kiểm tra hồ sơ đang sửa xem có hợp lệ theo schema `CVData` hay không và quét các vi phạm PII (SĐT, email, link, ngày sinh đầy đủ).
+* **Mô tả:** Kiểm tra hồ sơ đang sửa xem có hợp lệ theo schema `CVData` hay không và quét các vi phạm PII (SĐT, email, link, ngày sinh đầy đủ). Trước khi kiểm tra, hồ sơ được **dọn** (`pipeline.clean_cv`): cắt khoảng trắng hai đầu, bỏ dòng trống trong danh sách, bỏ hàng/ô/công việc trống hoàn toàn. `normalized_cv` và `fingerprint` tính trên bản đã dọn.
 * **Content-Type:** `application/json`
 * **Request JSON:**
 ```json
@@ -153,13 +160,37 @@ Mọi endpoint đều tuân thủ các quy tắc bảo mật từ [CLAUDE.md](fi
 }
 ```
 
+### 3.2. Dịch nội dung hồ sơ sang tiếng Anh (dịch máy offline)
+* **Endpoint:** `POST /api/cv/translate`
+* **Mô tả:** Dịch phần chữ tự do của hồ sơ từ tiếng Việt sang tiếng Anh bằng dịch máy **chạy ngay trên máy chủ** (CTranslate2 + Opus-MT, không gọi dịch vụ ngoài). Hồ sơ được dọn + kiểm tra cấu trúc (như 3.1) trước khi dịch. Chỉ dịch: chức danh mục tiêu, đoạn văn, gạch đầu dòng, thẻ năng lực (tên + ý), chức danh trong lộ trình/công việc/người tham chiếu, tên vị trí con, dòng phụ, nhóm việc, tên văn bằng. **Không dịch:** họ tên, tên công ty, tên trường, người tham chiếu (tên/công ty), thẻ kỹ năng, thời gian, ô số liệu. Thuật ngữ trong bảng cố định (`pdf_labels.toml`) được tra trước; đoạn không có dấu tiếng Việt bị bỏ qua. Mỗi đoạn dịch xong phải qua kiểm tra (số liệu giữ nguyên, không rỗng, độ dài hợp lý) — không đạt thì **giữ tiếng Việt** và báo trong `items`. Có đoạn được dịch thì `model_notes.self_created` được thêm một dòng nhắc phải đọc lại.
+* **Content-Type:** `application/json`
+* **Request JSON:** `{"cv": { ... }, "run_id": "tuỳ chọn, chỉ để gắn log"}`
+* **Response `200 OK`:**
+```json
+{
+  "cv": { ... },
+  "engine": "opus-mt-vi-en (CTranslate2 int8)",
+  "summary": {"translated": 31, "glossary": 4, "kept": 2, "skipped": 6},
+  "items": [
+    {"path": "sections[0].jobs[0].groups[0].bullets[1]", "status": "kept", "reason": "số liệu không khớp bản gốc"},
+    {"path": "sections[0].jobs[1].role", "status": "skipped", "reason": "không có dấu tiếng Việt (đã là tiếng Anh hoặc gõ không dấu)"}
+  ]
+}
+```
+  `items` chỉ liệt kê đoạn `kept` / `skipped` và **không chứa nội dung CV**. `status` đầy đủ: `translated` (dịch máy), `glossary` (bảng thuật ngữ), `kept`, `skipped`.
+* **Mã lỗi:**
+  * `400 Bad Request`: thiếu `cv`, hoặc `{"error": "Hồ sơ chưa hợp lệ nên chưa dịch được: ..."}`
+  * `429 Too Many Requests`: chờ quá `TRANSLATE_QUEUE_TIMEOUT` giây tới lượt dịch
+  * `503 Service Unavailable`: chưa bật dịch máy / chưa cài mô hình (`CV_TRANSLATOR=none` hoặc thiếu `data/models/...`); giao diện chỉ hiện nút dịch khi `/api/config` có `translation.available = true`
+  * `500 Internal Server Error`: `{"error": "Dịch máy gặp lỗi. ..."}`
+
 ---
 
 ## 4. Dựng PDF & Trạng thái (PDF & Status)
 
 ### 4.1. Dựng file PDF
 * **Endpoint:** `POST /api/pdf/build`
-* **Mô tả:** Nhận dữ liệu hồ sơ và thông tin dự án, đưa vào hàng đợi dựng PDF (`_render_slots`), gọi Playwright headless shell, quét checklist và tính toán trạng thái ban đầu.
+* **Mô tả:** Nhận dữ liệu hồ sơ và thông tin dự án, **dọn + kiểm tra cấu trúc** (cùng luật với `/api/cv/validate`), rồi đưa vào hàng đợi dựng PDF (`_render_slots`), gọi Playwright headless shell, quét checklist và tính toán trạng thái ban đầu. PDF luôn dựng từ hồ sơ đã chuẩn hoá; đây cũng là thao tác "Lưu" của tab Chỉnh sửa nội dung (bản đã lưu nằm trong phiên `run_id`). Response trả lại hồ sơ đã chuẩn hoá trong `cv` để giao diện đồng bộ lại form.
 * **Content-Type:** `application/json`
 * **Request JSON:**
 ```json
@@ -185,6 +216,7 @@ Mọi endpoint đều tuân thủ các quy tắc bảo mật từ [CLAUDE.md](fi
     {"code": "pii", "item": "Không còn SĐT, email, link, ngày sinh của ứng viên", "ok": true, "detail": "Sạch"},
     {"code": "pages", "item": "Số trang gọn (1-2 trang)", "ok": true, "detail": "2 trang (độ đầy trang cuối: 85%)"}
   ],
+  "cv": { ... },
   "status": {
     "outdated": false,
     "pdf_dirty": false,
@@ -197,6 +229,7 @@ Mọi endpoint đều tuân thủ các quy tắc bảo mật từ [CLAUDE.md](fi
 * **Mã lỗi:**
   * `429 Too Many Requests`: `{"error": "Đang có nhiều hồ sơ dựng cùng lúc, đã chờ quá 60 giây. Vui lòng bấm Cập nhật PDF lại sau ít phút."}`
   * `400 Bad Request`: `{"error": "Dựng PDF thất bại. Chi tiết lỗi..."}`
+  * `400 Bad Request` (hồ sơ sai cấu trúc, không dựng PDF): `{"error": "Hồ sơ chưa hợp lệ nên chưa lưu và dựng PDF được: full_name: Họ tên ứng viên đang trống"}`
 
 ### 4.2. Tính toán trạng thái khung PDF
 * **Endpoint:** `POST /api/pdf/status`

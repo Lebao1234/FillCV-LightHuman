@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import Field from './Field.jsx'
 import { SUPPORTED_LANGUAGES } from '@/i18n/config.jsx'
 
@@ -34,22 +34,6 @@ const ICON_CHECK = (
   </svg>
 )
 
-const ICON_COPY = (
-  <svg
-    width="15"
-    height="15"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-  </svg>
-)
-
 const ICON_UPLOAD = (
   <svg
     width="28"
@@ -80,8 +64,9 @@ export default function ExtractionPanel({
   project = '',
   position = '',
   pdfLang = 'vi',
+  keepContact = false,
+  photoUrl = null,
   elapsedSeconds = null,
-  summary = '',
   review = null,
   error = null,
   structureErrors = [],
@@ -93,10 +78,15 @@ export default function ExtractionPanel({
   const [inputProject, setInputProject] = useState(project || '')
   const [inputPosition, setInputPosition] = useState(position || '')
   const [inputLang, setInputLang] = useState(pdfLang || 'vi')
-  const [copied, setCopied] = useState(false)
+  const [inputKeepContact, setInputKeepContact] = useState(keepContact)
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef(null)
   const fileInputId = useId()
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setInputKeepContact(keepContact)
+  }, [keepContact])
 
   const hasData = Boolean(cvData)
   const isBusy = isExtracting || isBuildingPdf
@@ -110,6 +100,7 @@ export default function ExtractionPanel({
       project: inputProject,
       position: inputPosition,
       lang: inputLang,
+      keepContact: inputKeepContact,
     })
     setFile(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
@@ -138,14 +129,6 @@ export default function ExtractionPanel({
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0])
     }
-  }
-
-  // Sao chép nội dung tin nhắn tóm tắt
-  const handleCopySummary = () => {
-    if (!summary) return
-    navigator.clipboard.writeText(summary)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
   }
 
   // Danh sách các bước bóc tách mặc định nếu chưa nhận từ SSE
@@ -262,6 +245,32 @@ export default function ExtractionPanel({
               </div>
             </fieldset>
 
+            <fieldset className="form-fieldset mb-4">
+              <legend className="form-label">Thông tin liên hệ (SĐT, Email...)</legend>
+              <div className="contact-options">
+                <label>
+                  <input
+                    type="radio"
+                    name="initialKeepContact"
+                    value="strip"
+                    checked={!inputKeepContact}
+                    onChange={() => setInputKeepContact(false)}
+                  />
+                  Cắt bỏ toàn bộ liên hệ
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="initialKeepContact"
+                    value="keep"
+                    checked={inputKeepContact}
+                    onChange={() => setInputKeepContact(true)}
+                  />
+                  Giữ nguyên liên hệ
+                </label>
+              </div>
+            </fieldset>
+
             <button
               type="submit"
               className="btn btn-primary btn-block"
@@ -279,7 +288,8 @@ export default function ExtractionPanel({
                 <div className="sf-name">{originalName || file?.name || 'File CV'}</div>
                 <div className="sf-meta">
                   Dự án: <strong>{project || '—'}</strong> · Vị trí: <strong>{position || 'Theo CV'}</strong> · Ngôn ngữ:{' '}
-                  <strong>{pdfLang === 'en' ? 'English' : 'Tiếng Việt'}</strong>
+                  <strong>{pdfLang === 'en' ? 'English' : 'Tiếng Việt'}</strong> · Liên hệ:{' '}
+                  <strong>{keepContact ? 'Giữ nguyên' : 'Đã cắt bỏ'}</strong>
                 </div>
               </div>
             </div>
@@ -372,7 +382,7 @@ export default function ExtractionPanel({
                 <div className="c-specs">
                   {cvData.birth_year && <span>Năm sinh: <strong>{cvData.birth_year}</strong></span>}
                   {cvData.gender && <span>Giới tính: <strong>{cvData.gender}</strong></span>}
-                  <span>Ảnh chân dung: <strong>{cvData.has_photo ? 'Đã lấy từ CV gốc' : 'Không có trong CV'}</strong></span>
+                  <span>Ảnh chân dung: <strong>{photoUrl || cvData.has_photo ? 'Đã lấy từ CV gốc' : 'Không có trong CV'}</strong></span>
                   <span>
                     Ngôn ngữ CV gốc:{' '}
                     <strong>
@@ -466,30 +476,9 @@ export default function ExtractionPanel({
                 <div className="m">Vui lòng kiểm tra và sửa đổi ở tab &quot;Chỉnh sửa nội dung&quot; trước khi tải PDF.</div>
               </div>
             )}
-
-            {/* 8. Hộp tin nhắn tóm tắt để sao chép */}
-            {summary && (
-              <div className="summary-wrapper">
-                <div className="summary-bar">
-                  <span className="summary-label">Tin nhắn tóm tắt hồ sơ</span>
-                  <button
-                    type="button"
-                    className="btn-copy-summary"
-                    onClick={handleCopySummary}
-                    title="Sao chép toàn bộ tóm tắt"
-                    aria-label="Sao chép toàn bộ tóm tắt"
-                  >
-                    {ICON_COPY}
-                    {copied ? 'Đã sao chép!' : 'Sao chép'}
-                  </button>
-                </div>
-                <pre className="summary-box">{summary}</pre>
-              </div>
-            )}
           </div>
         )}
       </div>
     </div>
   )
 }
-

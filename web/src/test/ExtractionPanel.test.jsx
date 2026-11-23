@@ -14,6 +14,9 @@ describe('ExtractionPanel Component', () => {
     ).toBeInTheDocument()
     expect(screen.getByPlaceholderText(/Message Coffee/i)).toBeInTheDocument()
     expect(screen.getByText(/Ngôn ngữ xuất hồ sơ/i)).toBeInTheDocument()
+    expect(screen.getByText(/Thông tin liên hệ \(SĐT, Email\.\.\.\)/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Cắt bỏ toàn bộ liên hệ/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Giữ nguyên liên hệ/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Bắt đầu bóc tách CV/i })).toBeInTheDocument()
   })
 
@@ -56,7 +59,6 @@ describe('ExtractionPanel Component', () => {
       target_title: 'Kế Toán Trưởng',
       birth_year: 1988,
       gender: 'Nữ',
-      has_photo: true,
       expected_salary: '32.000.000 - 37.000.000 VND',
       model_notes: {
         removed: ['Địa chỉ nhà', 'Ngày sinh đầy đủ', 'Tình trạng hôn nhân'],
@@ -69,6 +71,7 @@ describe('ExtractionPanel Component', () => {
         originalName="Doan Thi May.pdf"
         project="Message Coffee"
         position="Kế Toán Trưởng"
+        photoUrl="/api/photo/preview/r1"
       />
     )
 
@@ -95,5 +98,39 @@ describe('ExtractionPanel Component', () => {
     const resetBtn = screen.getByRole('button', { name: /Làm mới \/ Nạp CV khác/i })
     fireEvent.click(resetBtn)
     expect(handleReset).toHaveBeenCalledTimes(1)
+  })
+
+  // Kiểm tra gửi tuỳ chọn keepContact khi bấm bóc tách CV
+  it('truyền lựa chọn keepContact khi submit form bóc tách', () => {
+    const handleSubmit = vi.fn()
+    const { container } = render(<ExtractionPanel onSubmitCv={handleSubmit} />)
+
+    // Chọn file
+    const file = new File(['dummy content'], 'test.pdf', { type: 'application/pdf' })
+    const fileInput = container.querySelector('input[type="file"]')
+    fireEvent.change(fileInput, { target: { files: [file] } })
+
+    // Chọn giữ nguyên liên hệ
+    const keepRadio = screen.getByLabelText(/Giữ nguyên liên hệ/i)
+    fireEvent.click(keepRadio)
+
+    // Bấm bóc tách
+    const submitBtn = screen.getByRole('button', { name: /Bắt đầu bóc tách CV/i })
+    fireEvent.click(submitBtn)
+
+    expect(handleSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        keepContact: true,
+      })
+    )
+  })
+
+  // Ảnh chân dung báo theo ảnh thật của phiên (photoUrl), không theo trường trong hồ sơ
+  it('báo có/không ảnh chân dung theo photoUrl', () => {
+    const cv = { full_name: 'A', target_title: 'B' }
+    const { rerender } = render(<ExtractionPanel cvData={cv} originalName="a.pdf" />)
+    expect(screen.getByText('Không có trong CV')).toBeInTheDocument()
+    rerender(<ExtractionPanel cvData={cv} originalName="a.pdf" photoUrl="/api/photo/preview/r1" />)
+    expect(screen.getByText('Đã lấy từ CV gốc')).toBeInTheDocument()
   })
 })
