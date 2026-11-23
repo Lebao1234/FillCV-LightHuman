@@ -7,6 +7,7 @@ Gọi các module khác qua TÊN MODULE (render.build_pdf, extraction.get_extrac
 import hashlib
 import json
 import logging
+import re
 import tempfile
 import threading
 from dataclasses import dataclass, field
@@ -348,6 +349,51 @@ def _clean_section(sec):
     }
 
 
+# Tách một dòng thông tin liên hệ khi bị dính nhiều thông tin trên 1 dòng (ngăn bởi •, SĐT, email...)
+def _unpack_contact_fact(fact: dict) -> list[dict]:
+    lbl = str(fact.get("label") or "").strip()
+    val = str(fact.get("value") or "").strip()
+    if not val:
+        return []
+    from services.privacy import checks
+    found = checks.scan_text(val)
+    if not found:
+        if lbl.lower() in ("address", "địa chỉ", "dia chi"):
+            val = re.sub(r"\s*[•·●▪|]\s*", ", ", val)
+            val = re.sub(r"\s{2,}", " ", val).strip(" ,;|:–-")
+            return [{"label": lbl, "value": val}]
+        return [fact]
+    emails = {v for k, v in found if k == "Email"}
+    found_filtered = [(k, v) for k, v in found if not (k == "Đường link" and any(v in e for e in emails))]
+    from services.extraction.rules import personal
+    cleaned = personal._scrub(val, set())
+    cleaned = re.sub(r"^(?:phone|email|address|điện thoại|địa chỉ|dia chi|sdt)\s*:\s*", "", cleaned, flags=re.I)
+    cleaned = re.sub(r"\s*[•·●▪|]\s*", ", ", cleaned)
+    cleaned = re.sub(r"\s{2,}", " ", cleaned).strip(" ,;|:–-")
+    if len(re.sub(r"[\W\d_]", "", cleaned)) < 3 and len(found_filtered) <= 1:
+        return [fact]
+    en = lbl.lower() in ("phone", "email", "address", "website", "social")
+    res = []
+    seen = set()
+    for k, v in found_filtered:
+        kind = personal._KIND_OF_CHECK.get(k, "phone")
+        if kind == "phone":
+            label_name = "Phone" if en else "Điện thoại"
+        elif kind == "email":
+            label_name = "Email"
+        elif kind == "link":
+            label_name = "Website"
+        else:
+            label_name = "Address" if en else "Địa chỉ"
+        if v not in seen:
+            seen.add(v)
+            res.append({"label": label_name, "value": v})
+    if cleaned and len(re.sub(r"[\W\d_]", "", cleaned)) >= 3:
+        addr_lbl = "Address" if en else "Địa chỉ"
+        res.append({"label": addr_lbl, "value": cleaned})
+    return res if res else [fact]
+
+
 # Dọn hồ sơ trước khi kiểm tra/dựng PDF
 def clean_cv(cv: dict) -> dict:
     """Dọn hồ sơ người dùng vừa sửa tay: cắt khoảng trắng, bỏ dòng/hàng/ô trống.
@@ -364,8 +410,12 @@ def clean_cv(cv: dict) -> dict:
         if key in out:
             out[key] = _opt(out[key])
     if isinstance(out.get("facts"), list):
-        facts = [{**f, "label": _strip(f.get("label", "")), "value": _strip(f.get("value", ""))}
-                 for f in out["facts"] if isinstance(f, dict)]
+        facts = []
+        for f in out["facts"]:
+            if isinstance(f, dict):
+                f_clean = {**f, "label": _strip(f.get("label", "")), "value": _strip(f.get("value", ""))}
+                if f_clean["value"]:
+                    facts.extend(_unpack_contact_fact(f_clean))
         out["facts"] = [f for f in facts if f["value"] != ""]
     if isinstance(out.get("stats"), list):
         stats = [{**s, "value": _strip(s.get("value", "")), "label": _strip(s.get("label", ""))}

@@ -148,7 +148,8 @@
       <span><b>{{ t.gender }}:</b> {{ cv.gender }}</span>
       {%- endif %}
       {%- for f in cv.facts if f.value %}
-      <span>{% if f.label %}<b>{{ f.label }}:</b> {% endif %}{{ f.value }}</span>
+      {%- set is_contact = f.label and f.label|lower in ('điện thoại', 'phone', 'email', 'địa chỉ', 'dia chi', 'address', 'website', 'mạng xã hội', 'social', 'sđt', 'sdt', 'mobile', 'tel', 'liên hệ', 'lien he', 'contact') -%}
+      <span{% if is_contact %} class="fact-contact"{% endif %}>{% if f.label %}<b>{{ f.label }}:</b> {% endif %}{{ f.value }}</span>
       {%- endfor %}
     </div>
   </div>

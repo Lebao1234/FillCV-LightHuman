@@ -78,3 +78,44 @@ def test_keep_contact_adds_contact_facts(cv_pdf):
     # Kiểm tra PII ở chế độ giữ liên hệ không coi các dòng này là vi phạm, còn chế độ cắt thì có
     assert checks.scan_pii_export(cv, "", "", keep_contact=True) == []
     assert checks.scan_pii_export(cv, "", "", keep_contact=False) != []
+
+
+# Khi mẫu CV gốc để dính các mục liên hệ trên 1 dòng với dấu chấm (•) hoặc nhãn Address
+def test_inline_bullet_contacts_separated():
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_text((50, 60), "NGUYEN NGOC KIM NGAN", fontsize=24)
+    page.insert_text((50, 90), "Cham soc khach hang", fontsize=14)
+    page.insert_text(
+        (50, 110),
+        "Address: The Riverside Residences – Tan My ward • Ho Chi Minh, Vietnam • kngan.ng224@gmail.com • +84 3333 69580",
+        fontsize=10,
+    )
+    page.insert_text((50, 150), "KINH NGHIEM LAM VIEC", fontsize=14)
+    page.insert_text((50, 170), "CONCENTRIX MALAYSIA", fontsize=12)
+    page.insert_text((50, 190), "Advisor II - Trust & Safety Associate", fontsize=10)
+    data = doc.tobytes()
+    doc.close()
+
+    cv = pipeline.read_cv(data, "kim_ngan.pdf", "Concentrix", "Advisor", keep_contact=True).cv
+    facts_dict = {f["label"]: f["value"] for f in cv["facts"]}
+
+    # SĐT, Email và Địa chỉ phải được tách riêng thành từng dòng (xuống hàng), không bị dính làm một
+    assert "Phone" in facts_dict or "Điện thoại" in facts_dict
+    assert "Email" in facts_dict
+    assert "Address" in facts_dict or "Địa chỉ" in facts_dict
+
+    phone_val = facts_dict.get("Phone") or facts_dict.get("Điện thoại")
+    assert "+84 3333 69580" in phone_val
+    assert facts_dict["Email"] == "kngan.ng224@gmail.com"
+
+    addr_val = facts_dict.get("Address") or facts_dict.get("Địa chỉ")
+    assert "The Riverside Residences" in addr_val
+    assert "kngan.ng224@gmail.com" not in addr_val
+    assert "+84 3333 69580" not in addr_val
+
+    # Kiểm tra render HTML sinh ra class fact-contact để xuống hàng
+    from services.pdf import render
+    html = render.render_html(cv, "Concentrix", "Candidate Profile", lang="en")
+    assert "fact-contact" in html
+    assert ".facts .fact-contact" in html

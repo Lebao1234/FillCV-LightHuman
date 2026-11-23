@@ -168,6 +168,11 @@ body.compact .identity {
   color: var(--navy);
 }
 
+.facts .fact-contact {
+  flex-basis: 100%;
+  white-space: pre-line;
+}
+
 /* Hàng ô số liệu */
 .stats {
   display: grid;

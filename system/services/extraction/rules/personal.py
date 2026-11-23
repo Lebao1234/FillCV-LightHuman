@@ -169,11 +169,15 @@ def find_original_stats(pre: list[Line], ident: Identity) -> None:
 # Tách dòng có nhiều cặp "Nhãn: nội dung" cách nhau bằng khoảng trống lớn/gạch đứng thành từng phần
 def _segments(line: Line) -> list[Line]:
     """'Năm sinh: 1987 <tab> Giới tính: Nữ' -> 2 dòng ảo; dòng không có nhãn nào thì giữ nguyên."""
-    parts = [p.strip() for p in re.split(r"\t+|\s+\|\s+|\s*[✦◆♦]\s*", line.text) if p.strip()]
+    parts = [p.strip() for p in re.split(r"\t+|\s*\|\s+|\s*[✦◆♦]\s*", line.text) if p.strip()]
     # tách khi có ô mang nhãn, hoặc có ô là thông tin liên hệ không nhãn (ô cạnh icon: "27/04/2001 <tab> fb ...")
-    if len(parts) < 2 or not any(content.label_of(p) or label_kind(p.rstrip(":")) or _found(p) for p in parts):
-        return [line]
-    return [replace(line, text=p, spans=[Span(p, line.bold, line.italic)]) for p in parts]
+    if len(parts) >= 2 and any(content.label_of(p) or label_kind(p.rstrip(":")) or _found(p) for p in parts):
+        return [replace(line, text=p, spans=[Span(p, line.bold, line.italic)]) for p in parts]
+    # Dòng có nhiều nhãn liên hệ ngăn bằng dấu chấm tròn •/· (vd: "Phone: 091... • Email: ... • Dia chi: ...")
+    bullet_parts = [p.strip() for p in re.split(r"\s*[•·●▪]\s*", line.text) if p.strip()]
+    if len(bullet_parts) >= 2 and sum(bool(content.label_of(p) or label_kind(p.rstrip(":"))) for p in bullet_parts) >= 2:
+        return [replace(line, text=p, spans=[Span(p, line.bold, line.italic)]) for p in bullet_parts]
+    return [line]
 
 
 # Xử lý một dòng "Nhãn: nội dung" thuộc nhóm thông tin cá nhân; trả True nếu đã dùng/bỏ dòng
@@ -189,7 +193,21 @@ def _apply_label(label: str, value: str, kind: str, ident: Identity, wish: list[
     if kind == "remove":
         removed_kind = r["_removed_index"].get(rulebook.norm(label), "address")
         ident.removed.add(removed_kind)
-        _capture(ident.contacts, removed_kind, value)
+        found = _found(value)
+        if found:
+            ident.removed.update(_KIND_OF_CHECK.get(k, "phone") for k, _ in found)
+            for k, v in found:
+                _capture(ident.contacts, _KIND_OF_CHECK.get(k, "phone"), v)
+            y = _BIRTH_YEAR.search(value)
+            if y and ident.birth_year is None and any(_KIND_OF_CHECK.get(k) == "birth" for k, _ in found):
+                ident.birth_year = int(y.group(1))
+            val_clean = _scrub(value, set())
+            val_clean = re.sub(r"\s*[•·●▪|]\s*", ", ", val_clean)
+            val_clean = re.sub(r"\s{2,}", " ", val_clean).strip(" ,;|:–-")
+            if val_clean and len(re.sub(r"[\W\d_]", "", val_clean)) >= 3:
+                _capture(ident.contacts, removed_kind, val_clean)
+        else:
+            _capture(ident.contacts, removed_kind, value)
     elif kind == "birth":
         y = _BIRTH_YEAR.search(value)
         if y:
@@ -251,7 +269,7 @@ def strip_personal(lines: list[Line], personal_ids: set[int], ident: Identity,
                 ident.gender = GENDER_WORDS[rulebook.norm(text)]
                 continue
             found = _found(text)
-            if found and len(re.sub(r"[\W\d_]", "", _scrub(text, set()))) < 3:
+            if found:
                 ident.removed.update(_KIND_OF_CHECK.get(k, "phone") for k, _ in found)
                 for k, v in found:
                     _capture(ident.contacts, _KIND_OF_CHECK.get(k, "phone"), v)
@@ -259,7 +277,15 @@ def strip_personal(lines: list[Line], personal_ids: set[int], ident: Identity,
                 y = _BIRTH_YEAR.search(text)
                 if y and ident.birth_year is None and any(_KIND_OF_CHECK.get(k) == "birth" for k, _ in found):
                     ident.birth_year = int(y.group(1))
-                continue                                          # dòng chỉ có SĐT/email/link/ngày sinh
+                # Phần còn lại của dòng sau khi bỏ SĐT/email/link: kiểm tra địa chỉ đi kèm
+                cleaned = _scrub(text, set())
+                cleaned = re.sub(r"^(?:address|dia\s*chi|địa\s*chỉ)\s*:\s*", "", cleaned, flags=re.I)
+                cleaned = re.sub(r"\s*[•·●▪|]\s*", ", ", cleaned)
+                cleaned = re.sub(r"\s{2,}", " ", cleaned).strip(" ,;|:–-")
+                if cleaned and (ADDRESS.search(cleaned) or "," in cleaned) and len(re.sub(r"[\W\d_]", "", cleaned)) >= 3:
+                    ident.removed.add("address")
+                    _capture(ident.contacts, "address", cleaned)
+                continue                                          # dòng có SĐT/email/link/ngày sinh (và địa chỉ nếu dính chung)
             if ADDRESS.search(text) and (re.search(r"\d", text) or "," in text):
                 ident.removed.add("address")
                 _capture(ident.contacts, "address", text)
@@ -336,6 +362,9 @@ CONTACT_FACTS = (("phone", "Điện thoại", "Phone"), ("email", "Email", "Emai
 # Ghi một giá trị liên hệ đã cắt (bỏ trùng); chỉ nhận các loại trong CONTACT_FACTS
 def _capture(store: dict[str, list[str]], kind: str, value: str) -> None:
     value = re.sub(r"\s+", " ", value or "").strip(" ,;|:–-")
+    if kind == "address":
+        value = re.sub(r"\s*[•·●▪|]\s*", ", ", value)
+        value = re.sub(r"\s{2,}", " ", value).strip(" ,;|:–-")
     if value and kind in {k for k, _, _ in CONTACT_FACTS} and value not in store.setdefault(kind, []):
         store[kind].append(value)
 
