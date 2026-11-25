@@ -12,10 +12,15 @@ _MON = (r"jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y
 _MON_INDEX = {m: i + 1 for i, m in enumerate(["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct",
                                                "nov", "dec"])}
 _YEAR = r"(?:19[5-9]\d|20[0-4]\d)"
-# Một mốc: ngày/tháng/năm, tháng/năm, "Tháng 3 năm 2019", "T3/2019", "Jan 2019", hoặc chỉ năm
+_DAY = r"\d{1,2}(?:st|nd|rd|th)?"
+# Một mốc: ngày/tháng/năm, tháng/năm, "Tháng 3 năm 2019", "T3/2019", ngày đầy đủ tiếng Anh ("June 16, 2021",
+# "16 June 2021", "May 8th, 2020"), "Jan 2019", hoặc chỉ năm. Dạng có ngày đứng TRƯỚC dạng "Jan 2019" để không bị cắt
+# mất phần "June 16" (trước đây chỉ bắt được "2021", phần "June 16" bị bỏ lại trong chữ)
 _POINT = (rf"(?:(?:ngày\s*)?\d{{1,2}}\s*[/.\-]\s*\d{{1,2}}\s*[/.\-]\s*{_YEAR}"
           rf"|(?:tháng|thg|th|t)\s*\.?\s*\d{{1,2}}\s*(?:[/.\-]|\s*năm\s*|\s+)\s*{_YEAR}"
           rf"|\d{{1,2}}\s*[/.\-]\s*{_YEAR}"
+          rf"|(?:{_MON})\.?\s+{_DAY}\s*,?\s*{_YEAR}"
+          rf"|{_DAY}\s+(?:of\s+)?(?:{_MON})\.?\s*,?\s*{_YEAR}"
           rf"|(?:{_MON})\.?\s*,?\s*{_YEAR}"
           rf"|{_YEAR})")
 _PRESENT = r"(?:đến\s+nay|tới\s+nay|hiện\s+tại|hiện\s+nay|nay|present|now|current|today|hiện\s+giờ)"

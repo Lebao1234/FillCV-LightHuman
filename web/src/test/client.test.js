@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   extractCv,
+  translateCv,
   getConfig,
   validateCv,
   buildPdf,
@@ -33,6 +34,23 @@ describe('API Client Module', () => {
     await new Promise((r) => setTimeout(r, 0))
     expect(sent[0].get('keep_contact')).toBe('true')
     expect(sent[1].has('keep_contact')).toBe(false)
+  })
+
+  // Dịch: gửi ngôn ngữ đích (mặc định en) để máy chủ dịch đúng chiều
+  it('translateCv gửi target trong payload', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ cv: {}, summary: {}, items: [] }) })
+    vi.stubGlobal('fetch', fetchMock)
+    await translateCv({ full_name: 'A' }, 'r1', 'vi')
+    await translateCv({ full_name: 'A' }, 'r1')
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).target).toBe('vi')
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body).target).toBe('en')
+  })
+
+  // Ảnh xem trước PDF: URL đổi theo phiên bản để trình duyệt không hiện ảnh cũ sau khi dựng lại
+  it('getPdfPageUrl gắn phiên bản vào URL', () => {
+    expect(getPdfPageUrl('r1', 2)).toBe('/api/preview/pdf/r1/2')
+    expect(getPdfPageUrl('r1', 2, 'abc')).toBe('/api/preview/pdf/r1/2?v=abc')
+    expect(getPdfPageUrl('r1', 1, 'abc')).not.toBe(getPdfPageUrl('r1', 1, 'xyz'))
   })
 
   // Kiểm tra lấy cấu hình hệ thống

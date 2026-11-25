@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Dự án là gì
 
-Web app nội bộ của Light Human (công ty tuyển dụng nhân sự): kiến trúc tách biệt gồm backend API Starlette mỏng tự viết và frontend React + Vite viết bằng JavaScript/JSX thuần (không TypeScript). Luồng xử lý: tải CV ứng viên (PDF/ảnh/DOCX) → bộ trích xuất chạy trên máy chủ dựng JSON hồ sơ → nhân viên xem/sửa → xuất PDF "Hồ sơ ứng viên" theo mẫu thương hiệu, đã bỏ thông tin liên hệ của ứng viên. **Không gọi AI/API bên ngoài** — kể cả khi dịch: chỉ dùng bảng dịch cố định và/hoặc **dịch máy offline chạy ngay trên máy chủ** (`services/translation/`, CTranslate2 + Opus-MT, mô hình nằm ở `data/models/`), tuyệt đối không dịch qua mạng.
+Web app nội bộ của Light Human (công ty tuyển dụng nhân sự): kiến trúc tách biệt gồm backend API Starlette mỏng tự viết và frontend React + Vite viết bằng JavaScript/JSX thuần (không TypeScript). Luồng xử lý: tải CV ứng viên (PDF/ảnh/DOCX) → bộ trích xuất chạy trên máy chủ dựng JSON hồ sơ → nhân viên xem/sửa → xuất PDF "Hồ sơ ứng viên" theo mẫu thương hiệu, đã bỏ thông tin liên hệ của ứng viên. **Không gọi AI/API bên ngoài — kể cả khi dịch**: đọc CV bằng bộ trích xuất theo luật chạy trên máy chủ; dịch Việt ↔ Anh bằng **dịch máy offline chạy ngay trên máy chủ** (`services/translation/`, CTranslate2 + cặp Opus-MT `opus-mt-vi-en` / `opus-mt-en-vi`, mô hình nằm ở `data/models/`), tuyệt đối không dịch qua mạng. Không dùng NLLB-200 (giấy phép CC-BY-NC 4.0 cấm thương mại).
 
 Tài liệu nghiệp vụ & kỹ thuật:
 - `docs/SKILL.md` — **quy chuẩn PDF** (bố cục, thứ phải bỏ, tên file `LH - CV <Vị trí> - <Họ tên> - <ddmmyyyy>.pdf`, checklist). Template và bộ kiểm tra hiện thực hoá file này.
@@ -64,7 +64,7 @@ docker compose up -d --build                      # truy cập http://localhost 
   - Frontend: `web/src/test/` (Vitest + Testing Library: `ExtractionPanel`, `ProfileForm`, `StatusBar`, `routes`, `client.js`). Chạy Vitest từ PowerShell (trong Git Bash bị lỗi `reading 'config'`); chạy một file: `npx vitest run src/test/routes.test.jsx`.
   - Khi sửa code backend mới, dùng `ruff check --isolated --select E4,E7,E9,F system/api system/tests` để đảm bảo code mới sạch lỗi.
 - Trên Windows, đặt `PYTHONIOENCODING=utf-8` khi script in tiếng Việt nếu console báo `UnicodeEncodeError`. Script chạy ngoài `system/` cần `PYTHONPATH=.` (từ `system/`).
-- Cấu hình: mọi giá trị có mặc định trong `infra/settings.py` (hoặc `config/company.toml`) và chỉ ghi đè được bằng **biến môi trường** (`HOST`, `PORT`, `CV_EXTRACTOR`, `CV_TRANSLATOR`, `TRANSLATE_MODEL_DIR`, `TRANSLATE_MAX_CONCURRENT`, `TRANSLATE_QUEUE_TIMEOUT`, `TRANSLATE_THREADS`, `TRANSLATE_PRELOAD`, `EXTRACT_MAX_CONCURRENT`, `EXTRACT_QUEUE_TIMEOUT`, `MAX_UPLOAD_MB`, `MAX_CV_PAGES`, `OUTPUT_DIR`, `LOG_DIR`, `OUTPUT_RETENTION_DAYS`, `RENDER_*`, `COMPANY_CONFIG`, `LOGO_PATH`, `LOGO_HEADER_PATH`, `CHROMIUM_NO_SANDBOX`). Không có `.env` / `python-dotenv`.
+- Cấu hình: mọi giá trị có mặc định trong `infra/settings.py` (hoặc `config/company.toml`) và chỉ ghi đè được bằng **biến môi trường** (`HOST`, `PORT`, `CV_EXTRACTOR`, `CV_TRANSLATOR`, `TRANSLATE_MODEL_DIR`, `TRANSLATE_MODEL_DIR_EN_VI`, `TRANSLATE_MAX_CONCURRENT`, `TRANSLATE_QUEUE_TIMEOUT`, `TRANSLATE_THREADS`, `TRANSLATE_PRELOAD`, `EXTRACT_MAX_CONCURRENT`, `EXTRACT_QUEUE_TIMEOUT`, `MAX_UPLOAD_MB`, `MAX_CV_PAGES`, `OUTPUT_DIR`, `LOG_DIR`, `OUTPUT_RETENTION_DAYS`, `RENDER_*`, `COMPANY_CONFIG`, `LOGO_PATH`, `LOGO_HEADER_PATH`, `CHROMIUM_NO_SANDBOX`). Không có `.env` / `python-dotenv`.
 
 ## Kiến trúc
 
@@ -84,7 +84,7 @@ Monolith phân tầng, một tiến trình Python, giữ nguyên semaphore đi�
 - `core/pdf_status.py` — `compute_status()`: luật khoá/mở nút "Tải PDF" và nhãn trạng thái nằm ở backend. Frontend chỉ hiển thị kết quả, không viết lại luật.
 - `services/extraction/` — bộ trích xuất theo luật (`rules/`) hoặc khung trống nhập tay (`manual.py`).
 - `services/pdf/` — `render.py`, `render_worker.py` (Chromium Playwright độc lập), `template.html` + `template.css`, `labels.py`.
-- `services/translation/nmt.py` — dịch nội dung hồ sơ vi → en bằng dịch máy offline (xem `docs/dich-may-offline.md`); script chuyển mô hình/đo: `system/scripts/`.
+- `services/translation/nmt.py` — dịch nội dung hồ sơ vi ↔ en **offline**: `Ct2Engine` (Opus-MT, mỗi mô hình một chiều) ghép bằng `PairEngine` (`TRANSLATE_MODEL_DIR` = vi→en, `TRANSLATE_MODEL_DIR_EN_VI` = en→vi); `Ct2MbartEngine` (VinAI, AGPL) và `Ct2NllbEngine` (NLLB, CC-BY-NC) chỉ để thử nghiệm; `translate_cv(cv, target)`, `supported_targets()` (xem `docs/dich-may-offline.md`); script chuyển mô hình/đo: `system/scripts/`.
 - `services/privacy/checks.py` — phát hiện PII + checklist chất lượng PDF.
 - `infra/` — `settings.py`, `tokens.py`, `logging_setup.py`, `storage.py`.
 
@@ -100,7 +100,7 @@ Monolith phân tầng, một tiến trình Python, giữ nguyên semaphore đi�
 
 ## Ràng buộc
 
-- **Không gọi AI/API ngoài**: không OpenAI, không dịch tự động qua mạng, toàn bộ dữ liệu CV không rời máy chủ. Dịch máy offline (`/api/cv/translate`) được phép vì chạy cục bộ; nó chỉ tạo **bản nháp** (đoạn nào kiểm tra không đạt giữ tiếng Việt, ghi vào `model_notes`), người dùng phải đọc lại; không đưa họ tên, công ty, trường, thẻ kỹ năng, thời gian, số liệu vào dịch máy; không ghi nội dung đoạn dịch vào log.
+- **Không gọi AI/API ngoài**: không OpenAI, không dịch qua mạng (không deep-translator / Google Translate), toàn bộ dữ liệu CV không rời máy chủ. Dịch máy offline (`/api/cv/translate`) được phép vì chạy cục bộ; chỉ đoạn `kind="text"` của `collect_slots` vào dịch máy (thẻ kỹ năng, thời gian, giá trị số liệu, giới tính, tiêu đề mục chỉ tra bảng thuật ngữ; tên công ty chỉ đổi loại hình doanh nghiệp theo luật cố định `translate_company()` — "Công ty Cổ phần X" ↔ "X Joint Stock Company" — tên riêng X giữ nguyên; họ tên, trường không dịch). Bản dịch chỉ là **bản nháp** (đoạn nào kiểm tra không đạt giữ nguyên bản gốc, ghi vào `model_notes`), người dùng phải đọc lại; không ghi nội dung đoạn dịch vào log. Không được âm thầm tạo PDF lẫn hai thứ tiếng: không dịch được thì giữ ngôn ngữ gốc hoặc hỏi lại người dùng. Mô hình mới phải có giấy phép cho phép dùng thương mại.
 - **Bảo vệ quyền riêng tư**: Không bao giờ ghi nội dung CV, họ tên hay tên file gốc vào log hoặc response lỗi. Dùng `mask_filename()` (`pdf#<sha8>`).
 - **Giữ nguyên từng điểm ảnh**: PDF xuất ra phải khớp từng điểm ảnh với mẫu mốc SKILL.md.
 - **Tiến trình đơn**: App chạy 1 tiến trình duy nhất (Starlette + uvicorn trên 127.0.0.1:8000; container bind 0.0.0.0:8000 nhưng không publish trực tiếp ra ngoài máy chủ).

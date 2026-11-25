@@ -72,6 +72,8 @@ async def get_config(request: Request) -> JSONResponse:
             "source": "vi",
             "target": "en",
             "engine": nmt.engine_name() if nmt.is_available() else "",
+            "targets": list(nmt.supported_targets()),     # ngôn ngữ đích dịch được: offline ["en"], online ["en", "vi"]
+            "online": nmt.is_online() if nmt.is_available() else False,   # True = nội dung đoạn dịch gửi ra dịch vụ ngoài
         },
     })
 
@@ -272,7 +274,7 @@ async def validate_cv(request: Request) -> JSONResponse:
 
 # Dịch nội dung hồ sơ tiếng Việt sang tiếng Anh (dịch máy offline)
 async def translate_cv(request: Request) -> JSONResponse:
-    """Dịch phần chữ tự do của hồ sơ vi -> en bằng dịch máy chạy trên máy chủ. Trả hồ sơ đã dịch + báo cáo từng đoạn."""
+    """Dịch phần chữ tự do của hồ sơ sang `target` ("en" mặc định | "vi"). Trả hồ sơ đã dịch + báo cáo từng đoạn."""
     try:
         body = await request.json()
     except Exception:
@@ -281,8 +283,14 @@ async def translate_cv(request: Request) -> JSONResponse:
     cv = body.get("cv")
     if not cv:
         return JSONResponse({"error": "Thiếu dữ liệu hồ sơ CV."}, status_code=400)
+    target = str(body.get("target") or "en").strip().lower()
+    if target not in ("en", "vi"):
+        return JSONResponse({"error": "Ngôn ngữ đích không hợp lệ (chỉ nhận en hoặc vi)."}, status_code=400)
     if not nmt.is_available():
         return JSONResponse({"error": "Chưa bật dịch máy trên máy chủ (thiếu mô hình dịch). Hãy nhờ quản trị viên cài theo docs/dich-may-offline.md."}, status_code=503)
+
+    if target not in nmt.supported_targets():
+        return JSONResponse({"error": "Bộ dịch trên máy chủ chưa dịch được sang tiếng Việt (mô hình offline chỉ dịch Việt → Anh)."}, status_code=503)
 
     # Dịch trên hồ sơ đã dọn + kiểm tra cấu trúc (cùng luật với lúc lưu)
     cv, structure_errors = pipeline.validate_structure(cv)
@@ -297,7 +305,7 @@ async def translate_cv(request: Request) -> JSONResponse:
     def do_translate():
         if run_id:
             logging_setup.set_run_id(run_id)
-        return nmt.translate_cv(cv)
+        return nmt.translate_cv(cv, target)
 
     try:
         result = await asyncio.to_thread(do_translate)
@@ -312,6 +320,7 @@ async def translate_cv(request: Request) -> JSONResponse:
     return JSONResponse({
         "cv": result.cv,
         "engine": result.engine,
+        "target": target,
         "summary": result.summary(),
         "items": [i for i in result.items if i["status"] in ("kept", "skipped")],
     })

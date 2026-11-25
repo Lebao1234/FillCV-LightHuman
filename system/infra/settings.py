@@ -135,8 +135,16 @@ def translator_name() -> str:
 
 # Thư mục chứa mô hình dịch máy đã chuyển sang CTranslate2
 def translate_model_dir() -> Path:
-    """Thư mục mô hình dịch máy (model.bin + source.spm + target.spm). TRANSLATE_MODEL_DIR; mặc định data/models/opus-mt-vi-en."""
+    """Thư mục mô hình dịch Việt -> Anh (CTranslate2). TRANSLATE_MODEL_DIR; mặc định data/models/opus-mt-vi-en.
+    Mô hình NLLB-200 (hai chiều) cũng đặt ở đây được, nhưng giấy phép CC-BY-NC 4.0 cấm dùng thương mại."""
     return _env_path("TRANSLATE_MODEL_DIR", REPO_ROOT / "data" / "models" / "opus-mt-vi-en")
+
+
+# Thư mục mô hình dịch chiều Anh -> Việt (Opus-MT en-vi)
+def translate_model_dir_en_vi() -> Path:
+    """Thư mục mô hình dịch Anh -> Việt (CTranslate2, Opus-MT en-vi, Apache-2.0). TRANSLATE_MODEL_DIR_EN_VI;
+    mặc định data/models/opus-mt-en-vi. Không có thì chỉ dịch được Việt -> Anh."""
+    return _env_path("TRANSLATE_MODEL_DIR_EN_VI", REPO_ROOT / "data" / "models" / "opus-mt-en-vi")
 
 
 # Nạp sẵn mô hình dịch khi khởi động

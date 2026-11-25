@@ -3,5 +3,8 @@
   // VS Code không còn kiểm tra biểu thức {{ ... }} trong thẻ style như CSS.
   "files.associations": {
     "**/services/pdf/*.html": "jinja-html"
+  },
+  "terminal.integrated.env.windows": {
+    "PYTHONDONTWRITEBYTECODE": "1"
   }
 }

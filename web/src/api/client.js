@@ -146,11 +146,11 @@ export async function validateCv(cv, project = '', position = '', runId = '', la
 }
 
 // Dịch nội dung hồ sơ tiếng Việt sang tiếng Anh bằng dịch máy offline trên máy chủ
-export async function translateCv(cv, runId = '') {
+export async function translateCv(cv, runId = '', target = 'en') {
   const res = await fetch(`${BASE_URL}/api/cv/translate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ cv, run_id: runId }),
+    body: JSON.stringify({ cv, run_id: runId, target }),
   })
   return handleJson(res)
 }
@@ -196,9 +196,10 @@ export function getOriginalPageUrl(runId, page = 1) {
   return `${BASE_URL}/api/preview/original/${encodeURIComponent(runId)}/${page}`
 }
 
-// URL ảnh trang PDF đã dựng
-export function getPdfPageUrl(runId, page = 1) {
-  return `${BASE_URL}/api/preview/pdf/${encodeURIComponent(runId)}/${page}`
+// URL ảnh trang PDF đã dựng; `version` (dấu vân tay bản PDF) đổi mỗi lần dựng lại để trình duyệt tải ảnh mới thay vì dùng ảnh cũ
+export function getPdfPageUrl(runId, page = 1, version = '') {
+  const url = `${BASE_URL}/api/preview/pdf/${encodeURIComponent(runId)}/${page}`
+  return version ? `${url}?v=${encodeURIComponent(version)}` : url
 }
 
 // URL tải file PDF về máy

@@ -23,14 +23,16 @@ services:
       # Mô hình dịch máy offline (vi -> en); thư mục này không nằm trong image
       - ./data/models:/app/data/models:ro
     environment:
+      - PYTHONDONTWRITEBYTECODE=1
       # Bộ trích xuất: "rules" (đọc PDF theo luật) hoặc "manual" (nhập tay)
       - CV_EXTRACTOR=rules
       # Hàng đợi
       - RENDER_MAX_CONCURRENT=2
       - EXTRACT_MAX_CONCURRENT=2
-      # Dịch máy offline: chọn mô hình (opus-mt-vi-en: nhẹ, chất lượng vừa; vinai-vi2en: tốt hơn nhưng AGPL-3.0, cần duyệt giấy phép)
+      # Dịch máy offline hai chiều: Opus-MT vi-en (CC-BY 4.0) + en-vi (Apache-2.0). Không dùng NLLB-200 (CC-BY-NC: cấm thương mại)
       - CV_TRANSLATOR=nmt
-      - TRANSLATE_MODEL_DIR=data/models/vinai-vi2en
+      - TRANSLATE_MODEL_DIR=data/models/opus-mt-vi-en
+      - TRANSLATE_MODEL_DIR_EN_VI=data/models/opus-mt-en-vi
       # Tự xoá PDF sau N ngày (0 = không xoá)
       - OUTPUT_RETENTION_DAYS=30
       - HOST=0.0.0.0

@@ -382,7 +382,8 @@ Không đặt thì dùng mặc định. Dự án **không đọc** file `.env`; 
 | `RENDER_TIMEOUT` | `120` | Giây tối đa cho một lần Chromium dựng PDF |
 | `RENDER_MAX_CONCURRENT` | `2` | Số lượt dựng PDF cùng lúc (mỗi lượt khoảng 300–400 MB RAM) |
 | `RENDER_QUEUE_TIMEOUT` | `300` | Giây tối đa chờ tới lượt dựng PDF |
-| `CV_TRANSLATOR` | `nmt` | `none` = tắt dịch máy offline (giao diện ẩn nút dịch). Dịch máy chỉ dùng được khi đã cài mô hình |
+| `CV_TRANSLATOR` | `nmt` | `nmt` = dịch máy offline trên máy chủ (cần mô hình trong `data/models`); `none` = tắt dịch (giao diện chỉ đổi nhãn) |
+| `TRANSLATE_MODEL_DIR_EN_VI` | `data/models/opus-mt-en-vi` | Mô hình dịch Anh → Việt (Opus-MT en-vi, Apache-2.0); không có thì chỉ dịch Việt → Anh |
 | `TRANSLATE_MODEL_DIR` | `data/models/opus-mt-vi-en` | Thư mục mô hình dịch (`model.bin`, `source.spm`, `target.spm`) |
 | `TRANSLATE_MAX_CONCURRENT` | `1` | Số lượt dịch cùng lúc |
 | `TRANSLATE_QUEUE_TIMEOUT` | `120` | Giây tối đa chờ tới lượt dịch |

@@ -71,8 +71,15 @@ export default function App() {
 
   // Nội dung hồ sơ mới nhất, để biết người dùng có gõ thêm trong lúc đang dựng PDF không
   const cvRef = useRef(null)
-  // Cặp hồ sơ {vi, en} khi nội dung đã được dịch tự động/thủ công: để đổi lại tiếng Việt khôi phục đúng bản gốc
+  // Khi nội dung đã được dịch: {base, baseLang, out, outLang} — bản trước khi dịch và bản dịch, để quay về ngôn ngữ gốc khôi phục đúng bản cũ
   const translatedRef = useRef(null)
+
+  // Ngôn ngữ của CV gốc ('en' nếu bộ đọc nhận là tiếng Anh, còn lại coi là tiếng Việt)
+  const sourceLangOf = (cv) => (cv?.language === 'en' ? 'en' : 'vi')
+
+  // Bộ dịch trên máy chủ có dịch sang ngôn ngữ này được không (offline chỉ sang 'en', online cả hai chiều)
+  const canTranslateTo = (lang) =>
+    Boolean(config?.translation?.available) && (config.translation.targets || ['en']).includes(lang)
   useEffect(() => {
     cvRef.current = cvData
   }, [cvData])
@@ -224,14 +231,24 @@ export default function App() {
         translatedRef.current = null
         const buildFirst = async () => {
           let cvForPdf = data.cv
-          if (initialLang === 'en' && data.cv.language !== 'en' && config?.translation?.available) {
+          let langForPdf = initialLang
+          const sourceLang = sourceLangOf(data.cv)
+          if (initialLang !== sourceLang) {
             setIsBuildingPdf(true) // giữ màn hình chờ trong lúc dịch
-            const en = await translateNow(data.cv, data.run_id)
-            if (en) {
-              translatedRef.current = { vi: data.cv, en }
-              cvForPdf = en
-              setCvData(en)
-              validateCv(en, prj, firstPosition, data.run_id, 'en', chosenKeepContact)
+            const out = canTranslateTo(initialLang) ? await translateNow(data.cv, data.run_id, initialLang) : null
+            if (!out) {
+              // Không dịch được: dựng bằng ngôn ngữ gốc của CV để bản PDF không lẫn hai thứ tiếng
+              langForPdf = sourceLang
+              setPdfLang(sourceLang)
+              if (!canTranslateTo(initialLang)) {
+                setTranslateError('Máy chủ chưa dịch được sang ngôn ngữ đã chọn nên hồ sơ được dựng bằng ngôn ngữ gốc của CV.')
+              }
+            }
+            if (out) {
+              translatedRef.current = { base: data.cv, baseLang: sourceLang, out, outLang: initialLang }
+              cvForPdf = out
+              setCvData(out)
+              validateCv(out, prj, firstPosition, data.run_id, langForPdf, chosenKeepContact)
                 .then((val) => {
                   setStructureErrors(val.structure_errors || [])
                   setViolations(val.violations || [])
@@ -239,7 +256,7 @@ export default function App() {
                 .catch((err) => console.error('Lỗi validate:', err))
             }
           }
-          handleBuildPdf(cvForPdf, data.run_id, prj, firstPosition, initialLang, chosenKeepContact)
+          handleBuildPdf(cvForPdf, data.run_id, prj, firstPosition, langForPdf, chosenKeepContact)
         }
         buildFirst()
       },
@@ -259,25 +276,48 @@ export default function App() {
     }
     const snap = translatedRef.current
     const same = (a, b) => JSON.stringify(a) === JSON.stringify(b)
-    // Sang English: nội dung còn tiếng Việt thì dịch máy trước (lỗi/không có dịch máy thì chỉ đổi nhãn như cũ)
-    if (newLang === 'en' && config?.translation?.available && cvData.language !== 'en' && !(snap && same(cvData, snap.en))) {
-      const en = await translateNow(cvData, runId)
-      if (en) {
-        translatedRef.current = { vi: cvData, en }
-        setPdfLang('en')
-        handleCvChange(en, 'en')
-        handleBuildPdf(en, runId, project, position, 'en', keepContact)
+    // Ngôn ngữ của NỘI DUNG đang hiển thị: bản đã dịch thì theo bản dịch, chưa dịch thì theo CV gốc
+    const contentLang = snap ? snap.outLang : sourceLangOf(cvData)
+
+    // Nội dung đã đúng ngôn ngữ được chọn: chỉ cần đổi nhãn/tiêu đề và dựng lại
+    if (newLang === contentLang) {
+      setPdfLang(newLang)
+      handleBuildPdf(cvData, runId, project, position, newLang, keepContact)
+      return
+    }
+    // Quay về ngôn ngữ trước khi dịch: khôi phục đúng bản gốc (không dịch ngược để khỏi sai lệch)
+    if (snap && newLang === snap.baseLang) {
+      const edited = !same(cvData, snap.out)
+      if (edited && !window.confirm('Bạn đã sửa bản dịch. Quay về ngôn ngữ gốc sẽ khôi phục nội dung trước khi dịch và mất phần đã sửa. Tiếp tục?')) return
+      translatedRef.current = null
+      setPdfLang(newLang)
+      handleCvChange(snap.base, newLang)
+      handleBuildPdf(snap.base, runId, project, position, newLang, keepContact)
+      return
+    }
+    // Sang ngôn ngữ khác với nội dung: dịch máy nội dung trước (nếu bộ dịch hỗ trợ chiều này)
+    if (canTranslateTo(newLang)) {
+      const out = await translateNow(cvData, runId, newLang)
+      if (out) {
+        translatedRef.current = { base: cvData, baseLang: contentLang, out, outLang: newLang }
+        setPdfLang(newLang)
+        handleCvChange(out, newLang)
+        handleBuildPdf(out, runId, project, position, newLang, keepContact)
         return
       }
     }
-    // Về tiếng Việt: nội dung chưa sửa sau khi dịch thì khôi phục đúng bản tiếng Việt trước khi dịch
-    if (newLang === 'vi' && snap && same(cvData, snap.en)) {
-      translatedRef.current = null
-      setPdfLang('vi')
-      handleCvChange(snap.vi, 'vi')
-      handleBuildPdf(snap.vi, runId, project, position, 'vi', keepContact)
-      return
-    }
+    // Không dịch được (chưa bật dịch, chiều không hỗ trợ, hoặc lỗi): KHÔNG âm thầm tạo bản lẫn hai thứ tiếng, hỏi lại người dùng
+    const names = { vi: 'Tiếng Việt', en: 'English' }
+    const ok = window.confirm(
+      `Chưa dịch được nội dung sang ${names[newLang]}.
+
+` +
+        `Nếu tiếp tục, bản PDF chỉ đổi nhãn và tiêu đề mục sang ${names[newLang]}, còn nội dung vẫn là ${names[contentLang]} (hai thứ tiếng lẫn nhau).
+
+` +
+        'Vẫn đổi ngôn ngữ?'
+    )
+    if (!ok) return
     setPdfLang(newLang)
     handleBuildPdf(cvData, runId, project, position, newLang, keepContact)
   }
@@ -325,11 +365,11 @@ export default function App() {
   }
 
   // Gọi dịch máy cho một hồ sơ (không hỏi lại); trả hồ sơ đã dịch hoặc null nếu lỗi
-  const translateNow = async (cv, rid) => {
+  const translateNow = async (cv, rid, target = 'en') => {
     setIsTranslating(true)
     setTranslateError(null)
     try {
-      const res = await translateCv(cv, rid)
+      const res = await translateCv(cv, rid, target)
       setCheckedGenerated(false) // bản dịch máy là mục hệ thống tự lập: phải tick lại sau khi đọc
       setReviewed(false)
       setTranslateReport({ summary: res.summary, items: res.items, engine: res.engine })
@@ -347,7 +387,8 @@ export default function App() {
     if (!cv0) return
     if (!window.confirm('Bỏ toàn bộ chỉnh sửa và quay về nội dung hệ thống đọc ban đầu từ CV gốc?')) return
     translatedRef.current = null
-    handleCvChange(JSON.parse(JSON.stringify(cv0)))
+    setPdfLang(sourceLangOf(cv0)) // nội dung về bản gốc thì nhãn cũng về ngôn ngữ gốc, tránh lẫn hai thứ tiếng
+    handleCvChange(JSON.parse(JSON.stringify(cv0)), sourceLangOf(cv0))
   }
 
   // Làm mới ứng dụng

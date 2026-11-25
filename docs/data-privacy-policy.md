@@ -9,8 +9,8 @@
 - **Luật Bảo vệ dữ liệu cá nhân** (Luật số 91/2025/QH15, hiệu lực từ 01/01/2026) và các văn bản hướng dẫn thi hành.
 - **Nghị định 13/2023/NĐ-CP** về bảo vệ dữ liệu cá nhân — cần xác định phần nào còn hiệu lực sau khi Luật có hiệu lực.
 - Pháp chế cần xác nhận: văn bản nào đang áp dụng và nghĩa vụ lập hồ sơ đánh giá tác động xử lý dữ liệu.
-  Từ 11/2026 công cụ **không còn gửi CV ra dịch vụ bên ngoài** (xem mục 3), nên không phát sinh việc chuyển dữ liệu
-  ra nước ngoài qua công cụ này.
+  Từ 11/2026 công cụ **không còn gửi CV ra dịch vụ bên ngoài** (cả đọc lẫn dịch, xem mục 3), nên không phát sinh việc
+  chuyển dữ liệu ra nước ngoài qua công cụ này.
 
 ## 2. Dữ liệu nào, đi đâu, giữ bao lâu (theo hành vi hiện tại của công cụ)
 
@@ -29,10 +29,11 @@ liên hệ của ứng viên (quét cả dữ liệu lẫn chính file PDF), Chr
 
 - Từ 11/2026 công cụ **đã gỡ OpenAI**: CV được đọc bằng bộ trích xuất chạy trên chính máy chủ của app, không gọi
   dịch vụ AI hay API bên ngoài (`services/extraction/`).
-- **Dịch sang tiếng Anh** dùng dịch máy **offline** (CTranslate2 + Opus-MT) chạy ngay trên máy chủ: nội dung CV không gửi
-  đi đâu, mô hình chỉ là file nằm trong `data/models/`. Họ tên, công ty, trường, thẻ kỹ năng, thời gian, số liệu không đưa
-  vào dịch máy; bản dịch chỉ là bản nháp, nhân viên phải đọc lại; log không ghi nội dung đoạn dịch
-  (`services/translation/`, `docs/dich-may-offline.md`).
+- **Dịch Việt ↔ Anh** dùng dịch máy **offline** (CTranslate2 + Opus-MT `vi-en` / `en-vi`) chạy ngay trên máy chủ: nội
+  dung CV không gửi đi đâu, mô hình chỉ là file nằm trong `data/models/`. Họ tên, công ty, trường, thẻ kỹ năng, thời
+  gian, số liệu không đưa vào dịch máy; bản dịch chỉ là bản nháp, nhân viên phải đọc lại; log không ghi nội dung đoạn
+  dịch (`services/translation/`, `docs/dich-may-offline.md`). (Ngày 25/11/2026 có thử dịch online qua Google Translate
+  bằng deep-translator trên máy phát triển với hồ sơ giả; đã gỡ, không triển khai.)
 - CV đã gửi tới OpenAI **trước thời điểm này** vẫn chịu điều khoản lưu trữ của OpenAI lúc đó [cần xác minh: thời hạn
   lưu phía OpenAI, có cần yêu cầu xoá không].
 

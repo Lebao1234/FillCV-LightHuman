@@ -148,3 +148,32 @@ def test_face_detector_cascades_loaded():
     assert "frontal_default" in tags
     assert "profile" in tags
 
+
+
+# Ngày đầy đủ tiếng Anh ("June 16, 2021", "16 June 2021", "May 8th, 2020") nhận nguyên vẹn, không bị cắt chỉ còn năm
+def test_english_full_dates():
+    from datetime import date
+    from services.extraction.rules import dates
+    today = date(2026, 11, 25)
+    for text, shown, start in [
+        ("Love and Contact – June 16, 2021", "June 16, 2021", (2021, 6)),
+        ("Graduation Date: May 8, 2020", "May 8, 2020", (2020, 5)),
+        ("May 8th, 2020", "May 8th, 2020", (2020, 5)),
+        ("16 June 2021", "16 June 2021", (2021, 6)),
+        ("June 16, 2019 – May 8, 2021", "June 16, 2019 – May 8, 2021", (2019, 6)),
+        ("Jan 2019 – Present", "Jan 2019 – Present", (2019, 1)),
+        ("03/2019 – Nay", "03/2019 – Nay", (2019, 3)),
+    ]:
+        p = dates.find_period(text, today)
+        assert p is not None and p.text == shown and p.start == start, text
+
+
+# Nhãn ngày đứng ngay trước ngày ("Graduation Date", "Ngày tốt nghiệp") bị bỏ khi ngày đã tách ra cột riêng
+def test_cut_period_drops_date_label():
+    from datetime import date
+    today = date(2026, 11, 25)
+    rest, p = content.cut_period("ERC Institute Singapore - HCM, Vietnam - Graduation Date: May 8, 2020", today)
+    assert rest == "ERC Institute Singapore - HCM, Vietnam" and p.text == "May 8, 2020"
+    rest, p = content.cut_period("Cử nhân Kế toán - Đại học Mẫu - Ngày tốt nghiệp: 15/06/2014", today)
+    assert rest == "Cử nhân Kế toán - Đại học Mẫu" and p.text == "15/06/2014"
+    assert content.cut_period("Công ty ABC	03/2019 - Nay", today)[0] == "Công ty ABC"

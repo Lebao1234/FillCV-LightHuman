@@ -12,14 +12,18 @@ from services.translation import nmt
 # Bộ dịch giả: bản dịch tra theo bảng, câu lạ thì thêm tiền tố "EN: "
 class FakeEngine:
     name = "fake-engine"
+    targets = ("en",)            # như mô hình offline: chỉ dịch sang tiếng Anh (test hai chiều tự đổi thành ("en", "vi"))
 
     def __init__(self, table: dict[str, str] | None = None):
         self.table = table or {}
         self.calls: list[list[str]] = []
+        self.targets_seen: list[str] = []
 
-    def translate(self, texts: list[str]) -> list[str]:
+    def translate(self, texts: list[str], target: str = "en") -> list[str]:
         self.calls.append(list(texts))
-        return [self.table.get(t, f"EN: {t}") for t in texts]
+        self.targets_seen.append(target)
+        prefix = "EN: " if target == "en" else "VI: "
+        return [self.table.get(t, f"{prefix}{t}") for t in texts]
 
 
 # Gắn bộ dịch giả cho mỗi test và gỡ sau khi xong
@@ -82,7 +86,7 @@ def test_translate_cv_translates_only_vietnamese_free_text(engine):
     job = res.cv["sections"][0]["jobs"][0]
     assert job["role"] == "Sales Manager"
     assert job["groups"][0]["bullets"] == ["Managed a team of 12 staff", "Increased revenue by 25% every year", "Managed the sales team"]
-    assert job["company"] == "Công ty Hoa Sen" and job["period"] == "03/2018 – Present"
+    assert job["company"] == "Hoa Sen Company" and job["period"] == "03/2018 – Present"
     assert res.cv["full_name"] == "Nguyễn Văn A" and res.cv["sections"][0]["tags"] == ["Excel"]
     assert res.cv["sections"][1]["education"][0]["detail"] == "Đại học Kinh tế Quốc dân"
     assert res.engine == "fake-engine"
@@ -91,7 +95,7 @@ def test_translate_cv_translates_only_vietnamese_free_text(engine):
     assert "Managed the sales team" not in sent
     # Báo cáo không chứa nội dung CV
     assert all(set(i) == {"path", "status", "reason"} for i in res.items)
-    assert "Công ty Hoa Sen" not in str(res.items)
+    assert "Hoa Sen" not in str(res.items)
 
 
 # Bảng thuật ngữ được áp trước, đoạn đó không gửi cho dịch máy
@@ -156,7 +160,7 @@ def test_unavailable_without_model(monkeypatch, tmp_path):
     nmt.set_engine(None)
     monkeypatch.setenv("TRANSLATE_MODEL_DIR", str(tmp_path / "khong-co"))
     assert nmt.is_available() is False
-    with pytest.raises(nmt.TranslatorUnavailable, match="dịch máy"):
+    with pytest.raises(nmt.TranslatorUnavailable, match="Chưa bật dịch"):
         nmt.translate_cv(sample_cv())
 
 
@@ -297,3 +301,214 @@ def test_period_now_becomes_present(engine):
     assert res["sections"][1]["education"][0]["period"] == "2008 – 2012"
     sent = {t for call in engine.calls for t in call}
     assert "03/2018 – Nay" not in sent
+
+
+# Hồ sơ mẫu tiếng Anh (CV gốc tiếng Anh) để thử chiều dịch en -> vi
+def sample_cv_en() -> dict:
+    cv = sample_cv()
+    cv.update(language="en", target_title="Sales Director", gender="Male",
+              facts=[{"label": "Desired", "value": "Accounting Manager · Full-time · Da Nang"}],
+              stats=[{"value": "Master's degree", "label": "Years of experience", "source": "original"}])
+    job = cv["sections"][0]["jobs"][0]
+    cv["sections"][0]["title"] = "Work Experience"
+    job.update(role="Sales Manager", period="Aug 2022 – Present", meta=[{"label": "Industry", "text": "Retail"}])
+    job["groups"][0]["bullets"] = ["Managed a team of 12 staff", "Tăng doanh thu 25% mỗi năm", "KPI 2024"]
+    cv["sections"][1]["title"] = "Education"
+    cv["sections"][1]["education"][0].update(title="Bachelor of Economics", detail="National Economics University")
+    return cv
+
+
+# Chiều en -> vi: đoạn tiếng Anh được dịch, đoạn đã có dấu tiếng Việt bỏ qua, tên riêng giữ nguyên, bảng thuật ngữ tra ngược
+def test_translate_to_vietnamese(engine):
+    engine.targets = ("en", "vi")
+    engine.table = {"Managed a team of 12 staff": "Quản lý đội ngũ 12 nhân viên", "KPI 2024": "KPI 2024"}
+    cv = sample_cv_en()
+    res = nmt.translate_cv(cv, "vi")
+    out = res.cv
+    job = out["sections"][0]["jobs"][0]
+    assert set(engine.targets_seen) == {"vi"}
+    assert job["groups"][0]["bullets"] == ["Quản lý đội ngũ 12 nhân viên", "Tăng doanh thu 25% mỗi năm", "KPI 2024"]
+    assert job["role"] == "Trưởng phòng kinh doanh"                    # bảng thuật ngữ tra ngược, viết hoa chữ đầu
+    assert job["period"] == "08/2022 – Nay"                          # ngày tiếng Anh đổi sang dạng số
+    assert job["meta"][0]["label"] == "Lĩnh vực"
+    assert out["target_title"] == "Giám đốc kinh doanh"
+    assert out["gender"] == "Nam"
+    assert out["facts"][0] == {"label": "Mong muốn", "value": "Trưởng phòng kế toán · Toàn thời gian · Đà Nẵng"}
+    assert out["stats"][0]["value"] == "Thạc sĩ"
+    assert out["sections"][0]["title"].upper() == "KINH NGHIỆM LÀM VIỆC"
+    # Tên riêng không gửi cho bộ dịch và giữ nguyên
+    assert job["company"] == "Công ty Hoa Sen" and out["full_name"] == "Nguyễn Văn A"   # đã là tiếng Việt: giữ nguyên
+    assert out["sections"][1]["education"][0]["detail"] == "National Economics University"
+    sent = {t for call in engine.calls for t in call}
+    assert "Tăng doanh thu 25% mỗi năm" not in sent                     # đã là tiếng Việt
+    assert not ({"Sales Manager", "Sales Director", "Industry", "National Economics University"} & sent)
+    # Đoạn bộ dịch trả y nguyên (thuật ngữ) không bị coi là lỗi
+    assert res.count("kept") == 0
+    assert any("tiếng Anh sang tiếng Việt" in n for n in out["model_notes"]["self_created"])
+
+
+# Bộ dịch chỉ có chiều vi -> en (mô hình offline) thì từ chối dịch sang tiếng Việt, không âm thầm trả bản lẫn lộn
+def test_offline_engine_rejects_vietnamese_target(engine):
+    assert nmt.supported_targets() == ("en",)
+    with pytest.raises(nmt.TranslatorUnavailable, match="chưa dịch được sang tiếng Việt"):
+        nmt.translate_cv(sample_cv_en(), "vi")
+
+
+# Endpoint: nhận target, báo chiều dịch hỗ trợ trong /api/config, từ chối target lạ / chiều không hỗ trợ
+def test_translate_endpoint_target(engine):
+    from starlette.testclient import TestClient
+    from api.server import app
+    with TestClient(app) as client:
+        assert client.get("/api/config").json()["translation"]["targets"] == ["en"]
+        assert client.post("/api/cv/translate", json={"cv": sample_cv(), "target": "fr"}).status_code == 400
+        assert client.post("/api/cv/translate", json={"cv": sample_cv_en(), "target": "vi"}).status_code == 503
+        engine.targets = ("en", "vi")
+        cfg = client.get("/api/config").json()["translation"]
+        assert cfg["targets"] == ["en", "vi"] and cfg["online"] is False
+        res = client.post("/api/cv/translate", json={"cv": sample_cv_en(), "target": "vi"})
+        assert res.status_code == 200 and res.json()["target"] == "vi"
+        assert res.json()["cv"]["sections"][0]["jobs"][0]["groups"][0]["bullets"][0].startswith("VI: ")
+
+
+# Mô hình NLLB-200: nhận diện đúng loại "nllb", hỗ trợ cả 2 chiều ("en", "vi") và luôn offline
+def test_nllb_model_detection_and_targets(tmp_path, monkeypatch):
+    nllb_dir = tmp_path / "nllb-200-vi-en"
+    nllb_dir.mkdir()
+    (nllb_dir / "model.bin").write_bytes(b"x")
+    (nllb_dir / "sentencepiece.bpe.model").write_bytes(b"x")
+    (nllb_dir / "shared_vocabulary.json").write_text('["vie_Latn", "eng_Latn"]', encoding="utf-8")
+
+    vinai_dir = tmp_path / "vinai-vi2en"
+    vinai_dir.mkdir()
+    (vinai_dir / "model.bin").write_bytes(b"x")
+    (vinai_dir / "sentencepiece.bpe.model").write_bytes(b"x")
+
+    assert nmt.model_kind(nllb_dir) == "nllb"
+    assert nmt.model_kind(vinai_dir) == "mbart"
+
+    monkeypatch.setenv("TRANSLATE_MODEL_DIR", str(nllb_dir))
+    monkeypatch.setattr(nmt.importlib.util, "find_spec", lambda name: object())
+    nmt.set_engine(None)
+    assert nmt.is_available() is True
+    assert nmt.supported_targets() == ("en", "vi")
+    assert nmt.is_online() is False
+
+
+# Cặp Opus-MT: có thêm mô hình en-vi thì hỗ trợ cả hai chiều; PairEngine chọn đúng mô hình theo ngôn ngữ đích
+def test_opus_pair_supports_both_directions(tmp_path, monkeypatch):
+    def marian(name):
+        d = tmp_path / name
+        d.mkdir()
+        for f in ("model.bin", "source.spm", "target.spm"):
+            (d / f).write_bytes(b"x")
+        return d
+
+    monkeypatch.setenv("TRANSLATE_MODEL_DIR", str(marian("opus-mt-vi-en")))
+    monkeypatch.setenv("TRANSLATE_MODEL_DIR_EN_VI", str(tmp_path / "khong-co"))
+    monkeypatch.setattr(nmt.importlib.util, "find_spec", lambda name: object())
+    nmt.set_engine(None)
+    assert nmt.supported_targets() == ("en",)                      # chưa có mô hình en-vi
+    monkeypatch.setenv("TRANSLATE_MODEL_DIR_EN_VI", str(marian("opus-mt-en-vi")))
+    assert nmt.supported_targets() == ("en", "vi")
+
+    vi_en, en_vi = FakeEngine(), FakeEngine()
+    vi_en.targets, en_vi.targets = ("en",), ("vi",)
+    pair = nmt.PairEngine(vi_en, en_vi)
+    assert pair.targets == ("en", "vi")
+    pair.translate(["Xin chào"], "en")
+    pair.translate(["Hello"], "vi")
+    assert vi_en.calls == [["Xin chào"]] and en_vi.calls == [["Hello"]]
+    nmt.set_engine(pair)
+    try:
+        res = nmt.translate_cv(sample_cv_en(), "vi")
+        assert res.cv["sections"][0]["jobs"][0]["groups"][0]["bullets"][0].startswith("VI: ")
+    finally:
+        nmt.set_engine(None)
+
+
+# Tên công ty: chỉ đổi loại hình doanh nghiệp theo luật cố định, tên riêng giữ nguyên, không gửi cho dịch máy
+@pytest.mark.parametrize("vi, en", [
+    ("CÔNG TY CỔ PHẦN MISA", "MISA JOINT STOCK COMPANY"),
+    ("Công ty CP Gốm Sứ Bạch Mai", "Gốm Sứ Bạch Mai Joint Stock Company"),
+    ("Công ty TNHH Nhựa Thanh Khê", "Nhựa Thanh Khê Co., Ltd."),
+    ("Công ty Trách nhiệm hữu hạn Một thành viên ABC", "ABC One Member Co., Ltd."),
+    ("Ngân hàng TMCP Á Châu", "Á Châu Joint Stock Commercial Bank"),
+    ("Tập đoàn Vingroup", "Vingroup Group"),
+    ("Tổng công ty Điện lực", "Điện lực Corporation"),
+    ("Concentrix Malaysia", "Concentrix Malaysia"),       # không có loại hình tiếng Việt: giữ nguyên
+])
+def test_translate_company_vi_to_en(vi, en):
+    assert nmt.translate_company(vi, "en") == en
+
+
+# Chiều Anh -> Việt: hậu tố tiếng Anh thành tiền tố tiếng Việt; tên không có hậu tố giữ nguyên
+@pytest.mark.parametrize("en, vi", [
+    ("MISA Joint Stock Company", "Công ty Cổ phần MISA"),
+    ("Sample Trading Co., Ltd.", "Công ty TNHH Sample Trading"),
+    ("Acme JSC", "Công ty Cổ phần Acme"),
+    ("SAMPLE TRADING COMPANY", "CÔNG TY SAMPLE TRADING"),
+    ("Gốm Sứ Bạch Mai Joint Stock Company", "Công ty Cổ phần Gốm Sứ Bạch Mai"),   # tên riêng có dấu vẫn đổi được
+    ("Concentrix Malaysia", "Concentrix Malaysia"),
+])
+def test_translate_company_en_to_vi(en, vi):
+    assert nmt.translate_company(en, "vi") == vi
+
+
+# Trong translate_cv: công ty ở công việc, lộ trình, người tham chiếu được đổi; không gửi cho dịch máy
+def test_company_names_in_cv(engine):
+    cv = sample_cv()
+    cv["sections"][0]["jobs"][0]["company"] = "CÔNG TY CỔ PHẦN MISA"
+    cv["sections"][0]["career_path"] = [{"period": "2020 – Nay", "title": "Kế toán", "company": "Công ty TNHH ABC"}]
+    res = nmt.translate_cv(cv, "en").cv
+    assert res["sections"][0]["jobs"][0]["company"] == "MISA JOINT STOCK COMPANY"
+    assert res["sections"][0]["career_path"][0]["company"] == "ABC Co., Ltd."
+    sent = {t for call in engine.calls for t in call}
+    assert not ({"CÔNG TY CỔ PHẦN MISA", "Công ty TNHH ABC"} & sent)
+
+
+# Sang tiếng Việt: ngày tiếng Anh trong khoảng thời gian đổi sang dạng số; "Present" -> "Nay"; không qua dịch máy
+def test_english_dates_to_vietnamese(engine):
+    engine.targets = ("en", "vi")
+    cv = sample_cv_en()
+    cv["sections"][0]["jobs"][0]["period"] = "Aug 2022 – Present"
+    cv["sections"][1]["education"][0]["period"] = "June 16, 2021"
+    out = nmt.translate_cv(cv, "vi").cv
+    assert out["sections"][0]["jobs"][0]["period"] == "08/2022 – Nay"
+    assert out["sections"][1]["education"][0]["period"] == "16/06/2021"
+    sent = {t for call in engine.calls for t in call}
+    assert "June 16, 2021" not in sent
+
+
+# Tên văn bằng tiếng Anh -> tiếng Việt bằng luật cố định (loại bằng + ngành theo bảng), không gửi cho dịch máy
+@pytest.mark.parametrize("en, vi", [
+    ("Bachelor of Business Administration", "Cử nhân Quản trị kinh doanh"),
+    ("Bachelor of Science in Accounting", "Cử nhân Kế toán"),
+    ("Master of Business Administration (MBA)", "Thạc sĩ Quản trị kinh doanh (MBA)"),
+    ("Certificate in Internal Communication Systems", "Chứng chỉ Internal Communication Systems"),
+    ("PhD in Economics", "Tiến sĩ Kinh tế"),
+    ("Bachelor of Engineering in Mechanical Engineering", "Kỹ sư Kỹ thuật cơ khí"),
+])
+def test_degree_to_vi(en, vi):
+    assert nmt.degree_to_vi(en) == vi
+
+
+# Trong translate_cv chiều en -> vi: tên văn bằng đi qua luật, không qua dịch máy
+def test_degree_title_not_sent_to_engine(engine):
+    engine.targets = ("en", "vi")
+    cv = sample_cv_en()
+    out = nmt.translate_cv(cv, "vi").cv
+    assert out["sections"][1]["education"][0]["title"] == "Cử nhân Kinh tế"
+    sent = {t for call in engine.calls for t in call}
+    assert "Bachelor of Economics" not in sent
+
+
+# Đoạn tiếng Anh chèn tên riêng có dấu không bị coi là tiếng Việt; đoạn tiếng Việt thật vẫn bị bỏ qua khi dịch sang vi
+@pytest.mark.parametrize("text, expected", [
+    ("Led team at Công ty ABC", False),
+    ("Managed projects for Tập đoàn Hòa Phát in Hà Nội", False),
+    ("Quản lý đội ngũ bán hàng tại chi nhánh", True),
+    ("Nguyễn Văn A", True),
+    ("2019 – 2021", True),
+])
+def test_already_in_vi_uses_word_ratio(text, expected):
+    assert nmt._already_in(text, "vi") is expected

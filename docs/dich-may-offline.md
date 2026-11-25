@@ -1,4 +1,14 @@
-# Dịch máy offline (vi → en)
+# Dịch máy offline (vi ↔ en)
+
+> **Cập nhật 25/11/2026:** dịch **hai chiều, hoàn toàn offline** bằng cặp Opus-MT chạy trên máy chủ:
+> `data/models/opus-mt-vi-en` (Việt → Anh, CC-BY 4.0, `TRANSLATE_MODEL_DIR`) và `data/models/opus-mt-en-vi` (Anh → Việt,
+> Apache-2.0, `TRANSLATE_MODEL_DIR_EN_VI`; tạo bằng `python scripts/convert_opus_mt.py --preset opus-en-vi`). Thiếu
+> mô hình en-vi thì chỉ dịch được Việt → Anh (`/api/config` → `translation.targets`).
+> Đổi ngôn ngữ ở cột **Bản PDF**: khác ngôn ngữ CV gốc thì dịch, quay lại ngôn ngữ gốc thì khôi phục bản trước khi dịch;
+> không dịch được thì hệ thống hỏi lại, không tự tạo bản lẫn hai thứ tiếng.
+> **Không dùng:** dịch online (deep-translator / Google Translate — gửi CV ra ngoài, bị chặn `TooManyRequests` khi thử);
+> **NLLB-200** (`facebook/nllb-200-distilled-600M`, giấy phép **CC-BY-NC 4.0: cấm thương mại**, kiểm tra trên HuggingFace
+> ngày 25/11/2026). VinAI vi2en (AGPL-3.0) vẫn chờ duyệt giấy phép.
 
 Tính năng "Dịch sang tiếng Anh" ở trang Chỉnh sửa nội dung (`/edit`) dùng **dịch máy chạy ngay trên máy chủ**:
 CTranslate2 (bộ chạy mô hình, CPU, int8) + Opus-MT `vi-en` (mô hình). CV không gửi ra ngoài, không cần internet khi chạy.
@@ -16,6 +26,7 @@ Code: `system/services/translation/nmt.py`, endpoint `POST /api/cv/translate` (x
    (vì `model_notes.self_created` có thêm dòng "Dịch máy ... cần đọc lại").
 4. Nhân viên đọc, sửa, bấm **Lưu & cập nhật PDF**. Muốn bỏ bản dịch: **Về bản đọc ban đầu**.
 
+**Tên công ty** chỉ đổi loại hình doanh nghiệp theo luật cố định (`translate_company`): "CÔNG TY CỔ PHẦN MISA" → "MISA JOINT STOCK COMPANY", "Công ty TNHH X" → "X Co., Ltd." và ngược lại; tên riêng giữ nguyên.
 **Không đưa vào dịch máy:** họ tên, tên công ty, tên trường, người tham chiếu (tên/công ty), thời gian.
 **Chỉ tra bảng thuật ngữ** (`config/translation_glossary.toml` + `pdf_labels.toml`, không có trong bảng thì giữ nguyên): giới tính, nhãn và giá trị dòng thông tin ("Mong muốn"), giá trị ô số liệu, thẻ kỹ năng, tiêu đề mục. Nhãn ô số liệu (câu ngắn) thì được dịch máy.
 Dấu in đậm `**...**` trong đoạn đã dịch máy bị mất (mô hình làm hỏng ký hiệu này).

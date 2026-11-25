@@ -44,7 +44,9 @@ Mọi endpoint đều tuân thủ các quy tắc bảo mật từ [CLAUDE.md](fi
     "available": true,
     "source": "vi",
     "target": "en",
-    "engine": "opus-mt-vi-en"
+    "engine": "opus-mt-vi-en",
+    "targets": ["en"],
+    "online": false
   }
 }
 ```
@@ -164,12 +166,15 @@ Mọi endpoint đều tuân thủ các quy tắc bảo mật từ [CLAUDE.md](fi
 * **Endpoint:** `POST /api/cv/translate`
 * **Mô tả:** Dịch phần chữ tự do của hồ sơ từ tiếng Việt sang tiếng Anh bằng dịch máy **chạy ngay trên máy chủ** (CTranslate2 + Opus-MT, không gọi dịch vụ ngoài). Hồ sơ được dọn + kiểm tra cấu trúc (như 3.1) trước khi dịch. Chỉ dịch: chức danh mục tiêu, đoạn văn, gạch đầu dòng, thẻ năng lực (tên + ý), chức danh trong lộ trình/công việc/người tham chiếu, tên vị trí con, dòng phụ, nhóm việc, tên văn bằng. **Không dịch:** họ tên, tên công ty, tên trường, người tham chiếu (tên/công ty), thẻ kỹ năng, thời gian, ô số liệu. Thuật ngữ trong bảng cố định (`pdf_labels.toml`) được tra trước; đoạn không có dấu tiếng Việt bị bỏ qua. Mỗi đoạn dịch xong phải qua kiểm tra (số liệu giữ nguyên, không rỗng, độ dài hợp lý) — không đạt thì **giữ tiếng Việt** và báo trong `items`. Có đoạn được dịch thì `model_notes.self_created` được thêm một dòng nhắc phải đọc lại.
 * **Content-Type:** `application/json`
-* **Request JSON:** `{"cv": { ... }, "run_id": "tuỳ chọn, chỉ để gắn log"}`
+* **Request JSON:** `{"cv": { ... }, "run_id": "tuỳ chọn, chỉ để gắn log", "target": "en"}`
+  * `target`: ngôn ngữ đích, `"en"` (mặc định, dịch Việt → Anh) hoặc `"vi"` (dịch Anh → Việt). Phải nằm trong `translation.targets` của `/api/config`: chỉ có mô hình Opus-MT vi-en thì `["en"]`; có thêm mô hình en-vi (`TRANSLATE_MODEL_DIR_EN_VI`) thì `["en", "vi"]`. Dịch chạy offline trên máy chủ nên `translation.online` luôn `false`. Chiều `"vi"`: đoạn đã có dấu tiếng Việt bị bỏ qua; bảng thuật ngữ được tra ngược; đoạn bộ dịch trả y nguyên (tên riêng, thuật ngữ) tính là `skipped`.
+* **Lỗi thêm:** `400` khi `target` không phải `en`/`vi`; `503` khi chưa có mô hình cho chiều được yêu cầu hoặc mô hình không nạp được.
 * **Response `200 OK`:**
 ```json
 {
   "cv": { ... },
   "engine": "opus-mt-vi-en (CTranslate2 int8)",
+  "target": "en",
   "summary": {"translated": 31, "glossary": 4, "kept": 2, "skipped": 6},
   "items": [
     {"path": "sections[0].jobs[0].groups[0].bullets[1]", "status": "kept", "reason": "số liệu không khớp bản gốc"},
@@ -285,6 +290,7 @@ Mọi endpoint đều tuân thủ các quy tắc bảo mật từ [CLAUDE.md](fi
 
 ### 5.3. Xem trước trang PDF đã dựng
 * **Endpoint:** `GET /api/preview/pdf/{run_id}/{page}`
+* **Tham số query tuỳ chọn:** `v` — phiên bản bản PDF (giao diện gửi `fingerprint`), chỉ để URL ảnh đổi sau mỗi lần dựng lại, tránh trình duyệt hiện ảnh cũ; máy chủ bỏ qua giá trị này.
 * **Mô tả:** Trả về hình ảnh PNG trang thứ `page` của bản PDF vừa dựng xong.
 * **Response `200 OK`:** `image/png`
 

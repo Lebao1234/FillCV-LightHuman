@@ -9,6 +9,10 @@ from contextlib import asynccontextmanager
 import logging
 import os
 from pathlib import Path
+import sys
+
+# Không sinh thư mục __pycache__ khi khởi chạy ứng dụng
+sys.dont_write_bytecode = True
 
 from starlette.applications import Starlette
 from starlette.exceptions import HTTPException

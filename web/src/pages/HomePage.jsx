@@ -6,6 +6,18 @@ import OriginalCvPreview from '../components/OriginalCvPreview.jsx'
 import ProfileForm from '../components/profile/ProfileForm.jsx'
 import { TABS, CONTACT_LABELS } from '../constants.js'
 
+// Ghi chú khi ngôn ngữ xuất khác ngôn ngữ CV gốc mà máy chủ không dịch được chiều đó: bản PDF chỉ đổi nhãn, nội dung giữ nguyên
+function langNoteFor(cv, pdfLang, translation) {
+  const names = { vi: 'tiếng Việt', en: 'tiếng Anh' }
+  const source = cv?.language === 'en' ? 'en' : 'vi'
+  if (pdfLang === source) return ''
+  const targets = translation?.available ? translation.targets || ['en'] : []
+  if (targets.includes(pdfLang)) {
+    return translation.online ? 'Nội dung được dịch bằng dịch vụ online (gửi ra ngoài máy chủ); bản dịch là bản nháp, cần đọc lại.' : ''
+  }
+  return `CV gốc ${names[source]} và máy chủ chưa dịch được sang ${names[pdfLang]}: bản này chỉ đổi nhãn và tiêu đề mục, nội dung vẫn là ${names[source]}.`
+}
+
 // Trang chính (/): nạp CV, theo dõi bóc tách; khung phải có 3 tab: bản PDF, CV gốc, chỉnh sửa nội dung
 export default function HomePage() {
   const {
@@ -110,6 +122,9 @@ export default function HomePage() {
                   setReviewed={setReviewed}
                   pdfLang={pdfLang}
                   onChangeLang={handleChangeLang}
+                  isTranslating={isTranslating}
+                  translateError={translateError}
+                  langNote={langNoteFor(cvData, pdfLang, translation)}
                   keepContact={keepContact}
                   contactMissing={!(cvData.facts || []).some((f) => CONTACT_LABELS.includes(f.label))}
                   onChangeKeepContact={handleChangeKeepContact}

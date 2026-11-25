@@ -16,6 +16,9 @@ export default function PdfPanel({
   setReviewed,
   pdfLang,
   onChangeLang,
+  isTranslating = false,
+  translateError = null,
+  langNote = '',
   keepContact = false,
   contactMissing = false,
   onChangeKeepContact,
@@ -114,9 +117,9 @@ export default function PdfPanel({
         </div>
       )}
 
-      {/* Hàng hành động */}
-      <div className="action-row">
-        <div className="lang-options">
+      {/* Tuỳ chọn ngôn ngữ & liên hệ chia 2 cột Tailwind, nút hành động xếp gọn một hàng */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-surface border border-line rounded-md mb-3">
+        <div className="lang-options min-w-0">
           <span className="font-medium text-muted">Ngôn ngữ:</span>
           <label>
             <input
@@ -124,6 +127,7 @@ export default function PdfPanel({
               name="pdf_lang"
               value="vi"
               checked={pdfLang === 'vi'}
+              disabled={isTranslating || isBuilding}
               onChange={() => onChangeLang('vi')}
             />
             Tiếng Việt
@@ -134,13 +138,30 @@ export default function PdfPanel({
               name="pdf_lang"
               value="en"
               checked={pdfLang === 'en'}
+              disabled={isTranslating || isBuilding}
               onChange={() => onChangeLang('en')}
             />
             English
           </label>
+          {/* Trạng thái dịch nội dung khi đổi ngôn ngữ: đang dịch / lỗi / chỉ đổi được nhãn */}
+          {isTranslating && (
+            <p className="m-0 mt-1 w-full text-xs text-muted" role="status" aria-live="polite">
+              Đang dịch nội dung hồ sơ, vui lòng chờ...
+            </p>
+          )}
+          {!isTranslating && translateError && (
+            <p className="m-0 mt-1 w-full text-xs text-err" role="alert">
+              Chưa dịch được: {translateError}
+            </p>
+          )}
+          {!isTranslating && !translateError && langNote && (
+            <p className="m-0 mt-1 w-full text-xs text-warn" role="note">
+              {langNote}
+            </p>
+          )}
         </div>
 
-        <div className="contact-options">
+        <div className="contact-options min-w-0">
           <label className="inline-flex items-center gap-1.5 cursor-pointer">
             <input
               type="checkbox"
@@ -156,7 +177,10 @@ export default function PdfPanel({
             </p>
           )}
         </div>
+      </div>
 
+      {/* Hàng nút hành động */}
+      <div className="action-row flex flex-wrap items-center gap-2.5">
         <button
           type="button"
           className={`btn ${status?.outdated || !hasPdf ? 'btn-primary' : 'btn-secondary'}`}
@@ -222,8 +246,8 @@ export default function PdfPanel({
         <div className="preview-container">
           {Array.from({ length: pageCount }, (_, i) => i + 1).map((p) => (
             <img
-              key={p}
-              src={getPdfPageUrl(pdfData.run_id, p)}
+              key={`${pdfData.fingerprint || ''}-${p}`}
+              src={getPdfPageUrl(pdfData.run_id, p, pdfData.fingerprint || pdfData.filename)}
               alt={`Trang ${p} - ${filename}`}
               loading="lazy"
             />

@@ -2,7 +2,6 @@ import { useState } from 'react'
 import PortraitEditor from './PortraitEditor.jsx'
 import GeneralInfoEditor from './GeneralInfoEditor.jsx'
 import StatsEditor from './StatsEditor.jsx'
-import TranslatePanel from './TranslatePanel.jsx'
 import {
   TextSection,
   BulletsSection,
@@ -57,12 +56,6 @@ export default function ProfileForm({
   onSave,
   onRevert,
   onViewPdf,
-  translationAvailable = false,
-  isTranslating = false,
-  translateReport = null,
-  translateError = null,
-  lang = 'vi',
-  onChangeLang,
 }) {
   const [openSections, setOpenSections] = useState({})
   const [newType, setNewType] = useState('experience')
@@ -145,18 +138,6 @@ export default function ProfileForm({
           </ul>
         </div>
       )}
-
-      {/* Chọn ngôn ngữ hồ sơ: English thì dịch máy nội dung (nếu máy chủ có), rồi dựng lại PDF */}
-      <TranslatePanel
-        lang={lang}
-        sourceLang={cv.language}
-        available={translationAvailable}
-        isTranslating={isTranslating}
-        isBusy={isSaving}
-        report={translateReport}
-        error={translateError}
-        onChangeLang={onChangeLang}
-      />
 
       {/* Dự án và Vị trí */}
       <div className="form-row mb-4">

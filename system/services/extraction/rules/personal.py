@@ -250,7 +250,11 @@ def strip_personal(lines: list[Line], personal_ids: set[int], ident: Identity,
         if pending:                                               # dòng này là nội dung của nhãn đứng ở dòng trước
             kind, label = pending
             pending = None
-            if _apply_label(label, text, kind, ident, wish, personal, desired):
+            is_next_label = bool(
+                (lab_next := content.label_of(text)) and label_kind(lab_next[0])
+                or (personal and label_kind(text) and len(text.split()) <= 5 and not l.bullet)
+            )
+            if not is_next_label and _apply_label(label, text, kind, ident, wish, personal, desired):
                 continue
         lab = content.label_of(text)
         if lab:

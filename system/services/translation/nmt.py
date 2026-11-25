@@ -1,5 +1,7 @@
-# Dịch nội dung hồ sơ CV tiếng Việt sang tiếng Anh bằng dịch máy offline (CTranslate2 + Opus-MT)
-"""Dịch phần chữ tự do của hồ sơ (gạch đầu dòng, đoạn văn, chức danh, dòng phụ...) vi -> en.
+# Dịch nội dung hồ sơ CV giữa tiếng Việt và tiếng Anh (dịch máy offline CTranslate2, hoặc online nếu được bật)
+"""Dịch phần chữ tự do của hồ sơ (gạch đầu dòng, đoạn văn, chức danh, dòng phụ...) sang ngôn ngữ đích ("en" | "vi").
+
+Chiều dịch: bộ offline (Opus-MT / VinAI vi2en) chỉ dịch vi -> en; bộ online dịch được cả hai chiều (supported_targets()).
 
 Nguyên tắc (xem docs/dich-may-offline.md):
 - Chạy hoàn toàn trên máy chủ: mô hình CTranslate2 nạp từ thư mục cục bộ, không gọi dịch vụ ngoài.
@@ -33,6 +35,38 @@ CACHE_MAX = 2000              # số đoạn nhớ trong bộ nhớ tiến trìn
 
 GLOSSARY_FILE = settings.PROJECT_ROOT / "config" / "translation_glossary.toml"
 
+LANG_NAMES = {"vi": "tiếng Việt", "en": "tiếng Anh"}
+# Loại hình doanh nghiệp Việt -> Anh (tiền tố tiếng Việt, hậu tố tiếng Anh); thứ tự: cụm dài trước cụm ngắn
+_COMPANY_FORMS = [
+    (r"công\s*ty\s+(?:tnhh|trách\s+nhiệm\s+hữu\s+hạn)\s+(?:mtv|một\s+thành\s+viên)", "One Member Co., Ltd."),
+    (r"công\s*ty\s+(?:tnhh|trách\s+nhiệm\s+hữu\s+hạn)", "Co., Ltd."),
+    (r"công\s*ty\s+(?:cp|cổ\s+phần)", "Joint Stock Company"),
+    (r"cty\s+(?:tnhh)", "Co., Ltd."),
+    (r"cty\s+(?:cp|cổ\s+phần)", "Joint Stock Company"),
+    (r"ngân\s+hàng\s+(?:tmcp|thương\s+mại\s+cổ\s+phần)", "Joint Stock Commercial Bank"),
+    (r"tổng\s+công\s+ty", "Corporation"),
+    (r"tập\s+đoàn", "Group"),
+    (r"doanh\s+nghiệp\s+tư\s+nhân", "Private Enterprise"),
+    (r"công\s*ty|cty", "Company"),
+]
+_COMPANY_VI = [(re.compile(rf"^\s*(?:{pat})\b[\s.,:\-–]*(?P<name>.+?)\s*$", re.IGNORECASE), en) for pat, en in _COMPANY_FORMS]
+# Chiều ngược Anh -> Việt: hậu tố tiếng Anh -> tiền tố tiếng Việt (cụm dài trước)
+_COMPANY_EN = [
+    (r"one\s+member\s+(?:co\.?,?\s*ltd\.?|company\s+limited|limited\s+liability\s+company)", "Công ty TNHH MTV"),
+    (r"(?:co\.?,?\s*ltd\.?|company\s+limited|limited\s+liability\s+company|llc)", "Công ty TNHH"),
+    (r"joint\s+stock\s+commercial\s+bank", "Ngân hàng TMCP"),
+    (r"(?:joint\s+stock\s+company|jsc)", "Công ty Cổ phần"),
+    (r"corporation|corp\.?", "Tổng công ty"),
+    (r"group", "Tập đoàn"),
+    (r"private\s+enterprise", "Doanh nghiệp tư nhân"),
+    (r"company|co\.?", "Công ty"),
+]
+_COMPANY_EN_RE = [(re.compile(rf"^\s*(?P<name>.+?)[\s,]+(?:{pat})\s*$", re.IGNORECASE), vi) for pat, vi in _COMPANY_EN]
+
+_PERIOD_PRESENT = re.compile(r"\b(?:Present|Now|Current|Currently|Today)\b", re.IGNORECASE)   # "Aug 2022 – Present" -> "Aug 2022 – Nay"
+_LATIN_WORD = re.compile(r"[A-Za-z]{2,}")                                                      # có chữ để dịch (không chỉ số/ký hiệu)
+_VI_WORD_RATIO = 0.4   # từ có dấu chiếm từ ngần này trở lên số từ thì đoạn coi là tiếng Việt (khi dịch sang vi)
+_EN_FUNCTION_WORDS = re.compile(r"\b(?:the|and|for|with|of|at|by|from|using|in|to|on)\b")   # từ chức năng tiếng Anh (chữ thường)
 _PERIOD_NOW = re.compile(r"\b(?:Hiện\s+nay|Hiện\s+tại|Nay|Đến\s+nay)\b", re.IGNORECASE)   # "03/2020 – Nay" -> "03/2020 – Present"
 
 _SENTENCE_END = re.compile(r"(?<=[.!?;])\s+")
@@ -55,32 +89,54 @@ class TranslateQueueTimeout(RuntimeError):
 class Engine(Protocol):
     name: str
 
-    # Dịch một danh sách câu tiếng Việt sang tiếng Anh (cùng thứ tự)
-    def translate(self, texts: list[str]) -> list[str]: ...
+    # Dịch một danh sách câu sang ngôn ngữ đích "en" | "vi" (cùng thứ tự)
+    def translate(self, texts: list[str], target: str = "en") -> list[str]: ...
 
 
 # Bộ dịch thật loại Marian (Opus-MT): CTranslate2 (CPU, int8) + SentencePiece
 class Ct2Engine:
     """Nạp mô hình Opus-MT đã chuyển sang CTranslate2 (model.bin + source.spm + target.spm). Dùng chung cả tiến trình."""
 
-    # Nạp mô hình và hai bộ tách từ từ thư mục mô hình
-    def __init__(self, model_dir, threads: int) -> None:
+    online = False
+
+    # Nạp mô hình và hai bộ tách từ; `target` = ngôn ngữ đích của mô hình ("en" cho opus-mt-vi-en, "vi" cho opus-mt-en-vi)
+    def __init__(self, model_dir, threads: int, target: str = "en") -> None:
         import ctranslate2
         import sentencepiece
 
         self.name = f"{model_dir.name} (CTranslate2 int8)"
+        self.targets = (target,)
         self._translator = ctranslate2.Translator(
             str(model_dir), device="cpu", compute_type="int8", inter_threads=1, intra_threads=threads
         )
         self._src = sentencepiece.SentencePieceProcessor(model_file=str(model_dir / "source.spm"))
         self._tgt = sentencepiece.SentencePieceProcessor(model_file=str(model_dir / "target.spm"))
 
-    # Dịch một lô câu
-    def translate(self, texts: list[str]) -> list[str]:
+    # Dịch một lô câu theo chiều cố định của mô hình
+    def translate(self, texts: list[str], target: str = "en") -> list[str]:
+        if target not in self.targets:
+            raise TranslatorUnavailable("Mô hình dịch này không dịch theo chiều được yêu cầu.")
+        if target == "vi":
+            return self._translate_en_vi(texts)
         # Bắt buộc có "</s>" cuối câu: thiếu thì mô hình không biết điểm dừng, dịch lặp từ đến hết 256 token (sai và chậm 30 lần)
         sources = [self._src.encode(t, out_type=str) + ["</s>"] for t in texts]
         results = self._translator.translate_batch(sources, beam_size=4, max_decoding_length=256)
         return [self._tgt.decode(r.hypotheses[0]).strip() for r in results]
+
+    # Chiều Anh -> Việt (opus-mt-en-vi): mô hình lặp từ vô tận với cụm ngắn không có dấu câu (lỗi của chính mô hình gốc,
+    # đã đối chiếu bằng transformers) -> thêm dấu chấm tạm, chặn lặp n-gram, giới hạn độ dài theo câu nguồn, rồi bỏ dấu chấm tạm
+    def _translate_en_vi(self, texts: list[str]) -> list[str]:
+        added = [not t.rstrip().endswith((".", "!", "?", ":", ";")) for t in texts]
+        sources = [self._src.encode(t.rstrip() + ("." if a else ""), out_type=str) + ["</s>"] for t, a in zip(texts, added)]
+        max_len = min(256, 3 * max((len(s) for s in sources), default=1) + 10)
+        results = self._translator.translate_batch(
+            sources, beam_size=4, max_decoding_length=max_len, no_repeat_ngram_size=3, repetition_penalty=1.2
+        )
+        out = []
+        for r, a in zip(results, added):
+            text = self._tgt.decode(r.hypotheses[0]).strip()
+            out.append(text[:-1].rstrip() if a and text.endswith(".") else text)
+        return out
 
 
 # Bộ dịch thật loại mBART (VinAI Translate vi2en): cần sentencepiece.bpe.model, có mã ngôn ngữ vi_VN / en_XX
@@ -100,8 +156,10 @@ class Ct2MbartEngine:
         )
         self._sp = sentencepiece.SentencePieceProcessor(model_file=str(model_dir / "sentencepiece.bpe.model"))
 
-    # Dịch một lô câu
-    def translate(self, texts: list[str]) -> list[str]:
+    # Dịch một lô câu (mô hình chỉ có chiều vi -> en)
+    def translate(self, texts: list[str], target: str = "en") -> list[str]:
+        if target != "en":
+            raise TranslatorUnavailable("Mô hình dịch offline hiện tại chỉ dịch tiếng Việt sang tiếng Anh.")
         # Đầu vào mBART: các mảnh + "</s>" + mã ngôn ngữ nguồn; đầu ra bắt đầu bằng mã ngôn ngữ đích (target_prefix)
         sources = [self._sp.encode(t, out_type=str) + ["</s>", "vi_VN"] for t in texts]
         results = self._translator.translate_batch(
@@ -110,14 +168,74 @@ class Ct2MbartEngine:
         return [self._sp.decode([p for p in r.hypotheses[0] if p not in self.SPECIAL]).strip() for r in results]
 
 
-# Loại mô hình trong thư mục: "marian" (Opus-MT), "mbart" (VinAI) hoặc None nếu thiếu file
+# Bộ dịch thật loại NLLB-200: cần sentencepiece.bpe.model, hỗ trợ cả 2 chiều vie_Latn <-> eng_Latn
+class Ct2NllbEngine:
+    """Nạp mô hình NLLB-200 đã chuyển sang CTranslate2 (model.bin + sentencepiece.bpe.model). Dùng chung cả tiến trình."""
+
+    SPECIAL = {"</s>", "<s>", "<pad>", "<unk>", "vie_Latn", "eng_Latn"}
+    targets = ("en", "vi")
+    online = False
+    _LANG_PAIR = {"en": ("vie_Latn", "eng_Latn"), "vi": ("eng_Latn", "vie_Latn")}
+
+    # Nạp mô hình và bộ tách từ từ thư mục mô hình
+    def __init__(self, model_dir, threads: int) -> None:
+        import ctranslate2
+        import sentencepiece
+
+        self.name = f"{model_dir.name} (NLLB-200 CTranslate2 int8)"
+        self._translator = ctranslate2.Translator(
+            str(model_dir), device="cpu", compute_type="int8", inter_threads=1, intra_threads=threads
+        )
+        self._sp = sentencepiece.SentencePieceProcessor(model_file=str(model_dir / "sentencepiece.bpe.model"))
+
+    # Dịch một lô câu theo chiều vi -> en hoặc en -> vi
+    def translate(self, texts: list[str], target: str = "en") -> list[str]:
+        if target not in self._LANG_PAIR:
+            raise TranslatorUnavailable("Mô hình NLLB-200 chỉ hỗ trợ dịch Việt ↔ Anh.")
+        src_lang, tgt_lang = self._LANG_PAIR[target]
+        sources = [[src_lang] + self._sp.encode(t, out_type=str) + ["</s>"] for t in texts]
+        results = self._translator.translate_batch(
+            sources, target_prefix=[[tgt_lang]] * len(sources), beam_size=4, max_decoding_length=256
+        )
+        return [self._sp.decode([p for p in r.hypotheses[0] if p not in self.SPECIAL]).strip() for r in results]
+
+
+# Ghép hai mô hình một chiều (vd Opus-MT vi-en + en-vi) thành một bộ dịch hai chiều
+class PairEngine:
+    """Chọn mô hình theo ngôn ngữ đích; mỗi mô hình chỉ dịch một chiều."""
+
+    online = False
+
+    # Nhận các bộ dịch con, mỗi bộ có thuộc tính targets
+    def __init__(self, *engines) -> None:
+        self._by_target = {t: e for e in engines for t in e.targets}
+        self.targets = tuple(self._by_target)
+        self.name = " + ".join(e.name for e in engines)
+
+    # Dịch bằng mô hình ứng với ngôn ngữ đích
+    def translate(self, texts: list[str], target: str = "en") -> list[str]:
+        if target not in self._by_target:
+            raise TranslatorUnavailable("Chưa có mô hình dịch cho chiều này trên máy chủ.")
+        return self._by_target[target].translate(texts, target)
+
+
+# Kiểm tra nhanh bộ từ vựng có phải NLLB-200 (chứa token vie_Latn) không
+def _is_nllb_dir(model_dir) -> bool:
+    for name in ("shared_vocabulary.json", "shared_vocabulary.txt"):
+        vocab_file = model_dir / name
+        if vocab_file.is_file() and "vie_Latn" in vocab_file.read_text(encoding="utf-8", errors="ignore"):
+            return True
+    return False
+
+
+# Loại mô hình trong thư mục: "marian" (Opus-MT), "nllb" (NLLB-200), "mbart" (VinAI) hoặc None nếu thiếu file
 def model_kind(model_dir) -> str | None:
     if not (model_dir / "model.bin").is_file():
         return None
     if (model_dir / "source.spm").is_file() and (model_dir / "target.spm").is_file():
         return "marian"
     if (model_dir / "sentencepiece.bpe.model").is_file():
-        return "mbart"
+        return "nllb" if _is_nllb_dir(model_dir) else "mbart"
     return None
 
 
@@ -149,6 +267,22 @@ def is_available() -> bool:
     return all(importlib.util.find_spec(m) is not None for m in ("ctranslate2", "sentencepiece"))
 
 
+# Các ngôn ngữ đích bộ dịch hiện tại dịch sang được: NLLB-200 hỗ trợ ("en", "vi"), Opus-MT/VinAI chỉ ("en",)
+def supported_targets() -> tuple[str, ...]:
+    if not is_available():
+        return ()
+    if _engine is not None:
+        return tuple(getattr(_engine, "targets", ("en",)))
+    if model_kind(settings.translate_model_dir()) == "nllb":
+        return ("en", "vi")
+    return ("en", "vi") if model_kind(settings.translate_model_dir_en_vi()) == "marian" else ("en",)
+
+
+# Bộ dịch hiện tại có gửi nội dung ra ngoài máy chủ không (luôn False vì chỉ chạy offline)
+def is_online() -> bool:
+    return bool(getattr(_engine, "online", False)) if _engine is not None else False
+
+
 # Tên bộ dịch đang dùng (để báo trên giao diện)
 def engine_name() -> str:
     return _engine.name if _engine is not None else settings.translate_model_dir().name
@@ -164,9 +298,16 @@ def _get_engine() -> Engine:
                     "Chưa bật dịch máy trên máy chủ (thiếu mô hình dịch). Xem docs/dich-may-offline.md để cài."
                 )
             model_dir = settings.translate_model_dir()
-            engine_cls = Ct2MbartEngine if model_kind(model_dir) == "mbart" else Ct2Engine
+            kind = model_kind(model_dir)
+            engine_cls = {"nllb": Ct2NllbEngine, "mbart": Ct2MbartEngine}.get(kind, Ct2Engine)
             try:
-                _engine = engine_cls(model_dir, settings.translate_threads())
+                main = engine_cls(model_dir, settings.translate_threads())
+                envi_dir = settings.translate_model_dir_en_vi()
+                if kind != "nllb" and model_kind(envi_dir) == "marian":
+                    # Thêm mô hình chiều Anh -> Việt nếu có (Opus-MT en-vi)
+                    _engine = PairEngine(main, Ct2Engine(envi_dir, settings.translate_threads(), target="vi"))
+                else:
+                    _engine = main
             except Exception as e:   # DLL bị chặn (Application Control), mô hình hỏng, thiếu RAM...
                 log.error("Không nạp được mô hình dịch máy (%s): %s", type(e).__name__, e)
                 raise TranslatorUnavailable(
@@ -197,6 +338,27 @@ def glossary_lookup(text: str) -> str | None:
     return hit
 
 
+# Bảng thuật ngữ tra ngược en -> vi (cụm tiếng Anh trùng nhau thì lấy cụm tiếng Việt khai báo trước)
+@lru_cache(maxsize=1)
+def _glossary_reverse() -> dict[str, str]:
+    data = tomllib.loads(GLOSSARY_FILE.read_text(encoding="utf-8"))
+    table: dict[str, str] = {}
+    for vi, en in data.get("phrases", {}).items():
+        table.setdefault(_gkey(en), vi)
+    return table
+
+
+# Tra bảng thuật ngữ theo chiều dịch; không có trả None
+def glossary_lookup_to(text: str, target: str) -> str | None:
+    """target="en": như glossary_lookup. target="vi": 'Chief Accountant' -> 'Kế toán trưởng' (viết hoa chữ đầu)."""
+    if target == "en":
+        return glossary_lookup(text)
+    hit = _glossary_reverse().get(_gkey(text))
+    if not hit:
+        return None
+    return hit.upper() if text.strip().isupper() else hit[:1].upper() + hit[1:]
+
+
 # Một đoạn chữ trong hồ sơ cần xét dịch: vị trí + nơi giữ giá trị
 @dataclass
 class Slot:
@@ -214,6 +376,87 @@ class Slot:
     # Ghi bản dịch vào hồ sơ
     def set(self, value: str) -> None:
         self.holder[self.key] = value
+
+
+_MONTHS_EN = {m: i + 1 for i, m in enumerate(["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"])}
+_MON_EN = r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?"
+_EN_MDY = re.compile(_MON_EN + r"\s+(\d{1,2})(?:st|nd|rd|th)?\s*,?\s*(\d{4})\b", re.IGNORECASE)              # June 16, 2021
+_EN_DMY = re.compile(r"\b(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?" + _MON_EN + r"\s*,?\s*(\d{4})\b", re.IGNORECASE)  # 16 June 2021
+_EN_MY = re.compile(_MON_EN + r"\s*,?\s*(\d{4})\b", re.IGNORECASE)                                            # Jan 2019
+
+
+# Ngày tiếng Anh trong khoảng thời gian -> dạng số kiểu Việt: "June 16, 2021" -> "16/06/2021", "Jan 2019" -> "01/2019"
+def _english_dates_to_vi(text: str) -> str:
+    def mon(name: str) -> int:
+        return _MONTHS_EN[name[:3].lower()]
+
+    text = _EN_MDY.sub(lambda m: f"{int(m.group(2)):02d}/{mon(m.group(1)):02d}/{m.group(3)}", text)
+    text = _EN_DMY.sub(lambda m: f"{int(m.group(1)):02d}/{mon(m.group(2)):02d}/{m.group(3)}", text)
+    return _EN_MY.sub(lambda m: f"{mon(m.group(1)):02d}/{m.group(2)}", text)
+
+
+# Loại văn bằng tiếng Anh -> tiếng Việt (mẫu ở ĐẦU tên bằng; cụm dài trước cụm ngắn)
+_DEGREE_EN = [
+    (r"(?:master\s+of\s+business\s+administration|mba)\b", "Thạc sĩ Quản trị kinh doanh"),
+    (r"(?:doctor\s+of\s+philosophy|ph\.?\s?d\.?)(?:\s+(?:in|of))?\b", "Tiến sĩ"),
+    (r"(?:master(?:'s)?(?:\s+degree)?(?:\s+of\s+(?:science|arts))?|m\.?sc\.?|m\.?a\.?)(?:\s+(?:in|of))?\b", "Thạc sĩ"),
+    (r"bachelor\s+of\s+engineering(?:\s+in)?\b", "Kỹ sư"),
+    (r"(?:bachelor(?:'s)?(?:\s+degree)?(?:\s+of\s+(?:science|arts))?|b\.?sc\.?|b\.?a\.?)(?:\s+(?:in|of))?\b", "Cử nhân"),
+    (r"(?:associate(?:'s)?\s+degree)(?:\s+(?:in|of))?\b", "Cao đẳng"),
+    (r"(?:certificate|certification)(?:\s+(?:in|of|on))?\b", "Chứng chỉ"),
+    (r"diploma(?:\s+(?:in|of))?\b", "Văn bằng"),
+]
+_DEGREE_EN_RE = [(re.compile(rf"^\s*{pat}\s*(?P<field>.*?)\s*$", re.IGNORECASE), vi) for pat, vi in _DEGREE_EN]
+# Ngành học thường gặp (tiếng Anh -> tiếng Việt); không có trong bảng thì giữ nguyên tiếng Anh
+_FIELDS_EN = {
+    "business administration": "Quản trị kinh doanh", "accounting": "Kế toán", "finance": "Tài chính",
+    "finance and banking": "Tài chính – Ngân hàng", "banking and finance": "Tài chính – Ngân hàng",
+    "economics": "Kinh tế", "marketing": "Marketing", "human resources": "Quản trị nhân lực",
+    "human resource management": "Quản trị nhân lực", "computer science": "Khoa học máy tính",
+    "information technology": "Công nghệ thông tin", "law": "Luật", "english": "Ngôn ngữ Anh",
+    "english language": "Ngôn ngữ Anh", "international business": "Kinh doanh quốc tế",
+    "international relations": "Quan hệ quốc tế", "hospitality management": "Quản trị khách sạn",
+    "tourism": "Du lịch", "logistics and supply chain management": "Logistics và Quản lý chuỗi cung ứng",
+    "supply chain management": "Quản lý chuỗi cung ứng", "mechanical engineering": "Kỹ thuật cơ khí",
+    "electrical engineering": "Kỹ thuật điện", "civil engineering": "Kỹ thuật xây dựng", "auditing": "Kiểm toán",
+    "public relations": "Quan hệ công chúng", "psychology": "Tâm lý học", "education": "Giáo dục",
+}
+
+
+# Tên văn bằng tiếng Anh -> tiếng Việt: "Bachelor of Business Administration" -> "Cử nhân Quản trị kinh doanh";
+# ngành không có trong bảng thì giữ nguyên ("Certificate in Internal Communication" -> "Chứng chỉ Internal Communication")
+def degree_to_vi(text: str) -> str | None:
+    src = (text or "").strip()
+    for pat, vi in _DEGREE_EN_RE:
+        m = pat.match(src)
+        if m:
+            field = m.group("field").strip(" ,–-:")
+            field_vi = _FIELDS_EN.get(_gkey(field)) or glossary_lookup_to(field, "vi") or field
+            return f"{vi} {field_vi}".strip()
+    return None
+
+
+# Dịch tên công ty theo luật cố định: chỉ đổi loại hình doanh nghiệp, giữ nguyên tên riêng (không qua dịch máy)
+def translate_company(text: str, target: str = "en") -> str:
+    """'CÔNG TY CỔ PHẦN MISA' -> 'MISA JOINT STOCK COMPANY'; 'Công ty TNHH Nhựa Thanh Khê' -> 'Nhựa Thanh Khê Co., Ltd.'.
+    target='vi': 'MISA Joint Stock Company' -> 'Công ty Cổ phần MISA'. Không khớp mẫu nào -> giữ nguyên."""
+    src = (text or "").strip()
+    if not src:
+        return text
+    upper = src.isupper()
+    if target == "en":
+        for pat, form in _COMPANY_VI:
+            m = pat.match(src)
+            if m and m.group("name").strip(" .,-–"):
+                out = f"{m.group('name').strip(' .,-–')} {form}"
+                return out.upper() if upper else out
+        return text
+    for pat, form in _COMPANY_EN_RE:
+        m = pat.match(src)
+        if m and m.group("name").strip(" .,-–"):
+            out = f"{form} {m.group('name').strip(' .,-–')}"
+            return out.upper() if upper else out
+    return text
 
 
 # Mọi đoạn chữ trong danh sách chuỗi của một đối tượng
@@ -270,15 +513,18 @@ def collect_slots(cv: dict) -> list[Slot]:
             slots += _list_slots(c, "items", f"{sp}.cards[{ci}]")
         for ci, c in enumerate(sec.get("career_path") or []):
             slots += _field_slot(c, "title", f"{sp}.career_path[{ci}]")
+            slots += _field_slot(c, "company", f"{sp}.career_path[{ci}]", "company")
             slots += _field_slot(c, "period", f"{sp}.career_path[{ci}]", "period")
         for ei, e in enumerate(sec.get("education") or []):
             slots += _field_slot(e, "title", f"{sp}.education[{ei}]")
             slots += _field_slot(e, "period", f"{sp}.education[{ei}]", "period")
         for ri, r in enumerate(sec.get("references") or []):
             slots += _field_slot(r, "title", f"{sp}.references[{ri}]")
+            slots += _field_slot(r, "company", f"{sp}.references[{ri}]", "company")
         for ji, job in enumerate(sec.get("jobs") or []):
             jp = f"{sp}.jobs[{ji}]"
             slots += _field_slot(job, "role", jp)
+            slots += _field_slot(job, "company", jp, "company")
             slots += _field_slot(job, "period", jp, "period")
             slots += _meta_slots(job.get("meta"), f"{jp}.meta")
             slots += _group_slots(job.get("groups"), f"{jp}.groups")
@@ -297,7 +543,7 @@ def _numbers(text: str) -> list[str]:
 
 
 # Bản dịch có đạt kiểm tra không; trả (đạt, lý do nếu không đạt)
-def check_translation(source: str, target: str) -> tuple[bool, str]:
+def check_translation(source: str, target: str, target_lang: str = "en") -> tuple[bool, str]:
     """Số liệu phải giữ nguyên (không mất/đổi/thêm số), bản dịch không rỗng, độ dài hợp lý, không chép nguyên bản gốc."""
     if not target.strip():
         return False, "bản dịch rỗng"
@@ -305,7 +551,7 @@ def check_translation(source: str, target: str) -> tuple[bool, str]:
         return False, "mô hình không dịch được"
     if _numbers(source) != _numbers(target):
         return False, "số liệu không khớp bản gốc"
-    if _VN_MONEY.search(source) and _FOREIGN_MONEY.search(target):
+    if target_lang == "en" and _VN_MONEY.search(source) and _FOREIGN_MONEY.search(target):
         return False, "đổi đơn vị tiền tệ (đồng thành ngoại tệ)"
     ratio = len(target) / max(1, len(source))
     if not (LENGTH_RATIO_MIN <= ratio <= LENGTH_RATIO_MAX):
@@ -335,12 +581,12 @@ def _key(text: str) -> str:
 
 
 # Dịch danh sách đoạn (đã khử trùng, có nhớ tạm) bằng bộ dịch
-def _translate_texts(engine: Engine, texts: list[str]) -> dict[str, str]:
+def _translate_texts(engine: Engine, texts: list[str], target: str = "en") -> dict[str, str]:
     out: dict[str, str] = {}
     pending: list[str] = []
     with _cache_lock:
         for t in dict.fromkeys(texts):
-            hit = _cache.get(_key(t))
+            hit = _cache.get(_key(f"{target}:{t}"))
             if hit is not None:
                 out[t] = hit
             else:
@@ -348,7 +594,7 @@ def _translate_texts(engine: Engine, texts: list[str]) -> dict[str, str]:
     if pending:
         pieces = [(t, _split_long(t)) for t in pending]
         flat = [p for _, ps in pieces for p in ps]
-        translated = engine.translate(flat)
+        translated = engine.translate(flat, target=target)
         if len(translated) != len(flat):
             raise RuntimeError("Bộ dịch trả số câu không khớp")
         it = iter(translated)
@@ -357,7 +603,7 @@ def _translate_texts(engine: Engine, texts: list[str]) -> dict[str, str]:
                 _cache.clear()
             for t, ps in pieces:
                 out[t] = " ".join(next(it) for _ in ps)
-                _cache[_key(t)] = out[t]
+                _cache[_key(f"{target}:{t}")] = out[t]
     return out
 
 
@@ -383,31 +629,34 @@ class TranslateResult:
 
 
 # Ghi chú vào model_notes để nhân viên biết phải đọc lại (ô "Đã kiểm tra các mục hệ thống tự lập")
-def _add_notes(cv: dict, result: TranslateResult) -> None:
+def _add_notes(cv: dict, result: TranslateResult, target: str = "en") -> None:
     notes = cv.setdefault("model_notes", {})
+    src_name, tgt_name = LANG_NAMES["vi" if target == "en" else "en"], LANG_NAMES[target]
     done = result.count("translated")
     kept = result.count("kept")
     if done:
-        msg = f"Dịch máy tiếng Việt sang tiếng Anh {done} đoạn nội dung (offline) — cần đọc lại toàn bộ trước khi gửi khách"
+        msg = f"Dịch máy {src_name} sang {tgt_name} {done} đoạn nội dung (offline) — cần đọc lại toàn bộ trước khi gửi khách"
         notes.setdefault("self_created", [])
         if msg not in notes["self_created"]:
             notes["self_created"].append(msg)
     if kept:
-        msg = f"{kept} đoạn giữ nguyên tiếng Việt vì bản dịch máy không đạt kiểm tra (số liệu/độ dài) — cần tự dịch"
+        msg = f"{kept} đoạn giữ nguyên {src_name} vì bản dịch máy không đạt kiểm tra (số liệu/độ dài) — cần tự dịch"
         notes.setdefault("other", [])
         if msg not in notes["other"]:
             notes["other"].append(msg)
 
 
 # Dịch một đoạn chỉ bằng bảng thuật ngữ / bảng nhãn / tiêu đề chuẩn; không có trong bảng -> None
-def _term_only(slot: Slot, text: str) -> str | None:
+def _term_only(slot: Slot, text: str, target: str = "en") -> str | None:
     def one(t: str) -> str:
         t = t.strip()
+        if slot.kind == "company":    # chỉ đổi loại hình doanh nghiệp, tên riêng giữ nguyên
+            return translate_company(t, target)
         if slot.kind == "period":     # chỉ đổi chữ chỉ "đến nay"; ngày tháng giữ nguyên
-            return _PERIOD_NOW.sub("Present", t)
+            return _PERIOD_NOW.sub("Present", t) if target == "en" else _english_dates_to_vi(_PERIOD_PRESENT.sub("Nay", t))
         if slot.kind == "title":
-            return labels.translate_title(t, "en")
-        return glossary_lookup(t) or labels.translate_term(t, "en") or t
+            return labels.translate_title(t, target)
+        return glossary_lookup_to(t, target) or labels.translate_term(t, target) or t
 
     if slot.split:
         parts = [one(p) for p in text.split(slot.split)]
@@ -426,9 +675,27 @@ def preload() -> bool:
         return False
 
 
-# Dịch toàn bộ nội dung tự do của hồ sơ vi -> en
-def translate_cv(cv: dict) -> TranslateResult:
+# Đoạn chữ đã ở ngôn ngữ đích (không cần dịch) hay chưa
+def _already_in(text: str, target: str) -> bool:
+    """target="en": đoạn không có dấu tiếng Việt coi là đã tiếng Anh (hoặc gõ không dấu).
+    target="vi": đoạn có dấu tiếng Việt coi là đã tiếng Việt; đoạn không có chữ Latin (chỉ số/ký hiệu) cũng bỏ qua."""
+    if target == "en":
+        return not has_vi(text)
+    words = [w for w in text.split() if _LATIN_WORD.search(w) or has_vi(w)]
+    if not words or not _LATIN_WORD.search(text):
+        return True
+    # Câu tiếng Anh chèn tên riêng có dấu ("Led team at Công ty ABC", "... for Tập đoàn Hòa Phát in Hà Nội") không được
+    # coi là tiếng Việt: có từ chức năng tiếng Anh, hoặc tỉ lệ từ có dấu thấp
+    if _EN_FUNCTION_WORDS.search(text):
+        return False
+    return sum(1 for w in words if has_vi(w)) / len(words) >= _VI_WORD_RATIO
+
+
+# Dịch toàn bộ nội dung tự do của hồ sơ sang ngôn ngữ đích ("en": vi -> en, "vi": en -> vi)
+def translate_cv(cv: dict, target: str = "en") -> TranslateResult:
     """Trả bản sao hồ sơ đã dịch + báo cáo từng đoạn. `cv` truyền vào giữ nguyên.
+
+    `target` phải nằm trong supported_targets() nếu có đoạn cần dịch máy (bộ offline chỉ dịch sang "en").
 
     Chờ tới lượt (TRANSLATE_MAX_CONCURRENT); quá TRANSLATE_QUEUE_TIMEOUT giây -> TranslateQueueTimeout.
     """
@@ -446,15 +713,24 @@ def translate_cv(cv: dict) -> TranslateResult:
             continue
         if slot.kind != "text":
             # Chỉ tra bảng: không có trong bảng thì giữ nguyên, không báo (tên riêng, thẻ lạ...)
-            new = _term_only(slot, text)
+            new = _term_only(slot, text, target)
             if new is not None and new != text:
                 slot.set(new)
                 result.items.append({"path": slot.path, "status": "glossary", "reason": ""})
             continue
-        if not has_vi(text):
-            result.items.append({"path": slot.path, "status": "skipped", "reason": "không có dấu tiếng Việt (đã là tiếng Anh hoặc gõ không dấu)"})
+        if target == "vi" and ".education[" in slot.path and slot.path.endswith(".title"):
+            # Tên văn bằng tiếng Anh: dịch máy hay sai hẳn nghĩa ("Bachelor of ..." -> "Một phần của thế giới") -> luật cố định
+            degree = degree_to_vi(text)
+            if degree:
+                slot.set(degree)
+                result.items.append({"path": slot.path, "status": "glossary", "reason": ""})
+                continue
+        if _already_in(text, target):
+            reason = ("không có dấu tiếng Việt (đã là tiếng Anh hoặc gõ không dấu)" if target == "en"
+                      else "đã là tiếng Việt hoặc không có chữ để dịch")
+            result.items.append({"path": slot.path, "status": "skipped", "reason": reason})
             continue
-        term = glossary_lookup(text) or labels.translate_term(text, "en")
+        term = glossary_lookup_to(text, target) or labels.translate_term(text, target)
         if term and term != text:
             slot.set(term)
             result.items.append({"path": slot.path, "status": "glossary", "reason": ""})
@@ -470,21 +746,29 @@ def translate_cv(cv: dict) -> TranslateResult:
         try:
             engine = _get_engine()
             result.engine = engine.name
+            if target not in getattr(engine, "targets", ("en",)):
+                raise TranslatorUnavailable(
+                    f"Bộ dịch hiện tại ({engine.name}) chưa dịch được sang {LANG_NAMES.get(target, target)}."
+                )
             # Bỏ dấu in đậm **...** trước khi dịch (mô hình làm hỏng ký hiệu này)
             sources = {s.path: s.text.strip().replace("**", "") for s in to_translate}
-            translated = _translate_texts(engine, list(sources.values()))
+            translated = _translate_texts(engine, list(sources.values()), target)
         finally:
             _slots.release()
         for slot in to_translate:
             src = sources[slot.path]
             out = translated[src].strip()
-            ok, reason = check_translation(src, out)
+            if target == "vi" and out == src:
+                # Sang tiếng Việt: tên riêng/thuật ngữ thường được giữ nguyên, không coi là lỗi
+                result.items.append({"path": slot.path, "status": "skipped", "reason": "giữ nguyên (tên riêng hoặc thuật ngữ)"})
+                continue
+            ok, reason = check_translation(src, out, target)
             if ok:
                 slot.set(out)
                 result.items.append({"path": slot.path, "status": "translated", "reason": ""})
             else:
                 result.items.append({"path": slot.path, "status": "kept", "reason": reason})
 
-    _add_notes(work, result)
-    log.info("Dịch máy xong: %s", result.summary())
+    _add_notes(work, result, target)
+    log.info("Dịch máy xong (sang %s): %s", target, result.summary())
     return result

@@ -104,13 +104,24 @@ def parts_of(text: str) -> list[str]:
     return [p.strip(" ,;:") for p in _SPLIT.split(text or "") if p.strip(" ,;:")]
 
 
+# Nhãn ngày đứng cuối phần chữ trước ngày ("Graduation Date:", "Ngày tốt nghiệp:"...) — bỏ khi đã tách ngày ra riêng
+_DATE_LABEL_TAIL = re.compile(
+    r"[\s|,–—-]*(?:graduation\s+date|date\s+of\s+graduation|graduated(?:\s+on)?|completion\s+date|date\s+of\s+issue|"
+    r"issued(?:\s+on)?|expected\s+graduation|ngày\s+tốt\s+nghiệp|tốt\s+nghiệp(?:\s+năm)?|ngày\s+cấp|năm\s+tốt\s+nghiệp)"
+    r"\s*[:：]?\s*$",
+    re.IGNORECASE,
+)
+
+
 # Bỏ khoảng thời gian khỏi chữ, trả (phần còn lại, Period | None)
 def cut_period(text: str, today: date) -> tuple[str, dates.Period | None]:
     """'Công ty ABC\t03/2019 - Nay' -> ('Công ty ABC', Period(03/2019 – Nay))."""
     p = dates.find_period(text, today)
     if not p:
         return text, None
-    rest = re.sub(r"\(\s*\)", " ", text[:p.span[0]] + " " + text[p.span[1]:]).strip(" \t|,–—-:")
+    # Nhãn đứng ngay trước ngày ("Graduation Date: May 8, 2020", "Ngày tốt nghiệp: 06/2015") là thừa khi ngày đã tách riêng
+    before = _DATE_LABEL_TAIL.sub("", text[:p.span[0]])
+    rest = re.sub(r"\(\s*\)", " ", before + " " + text[p.span[1]:]).strip(" \t|,–—-:")
     rest = rest.removeprefix("(") if rest.count("(") > rest.count(")") and rest.startswith("(") else rest
     rest = rest.removesuffix(")") if rest.count(")") > rest.count("(") and rest.endswith(")") else rest
     rest = re.sub(r"\s*\($", "", rest)                           # "Kế toán (" còn lại khi ngày nằm trong ngoặc
@@ -169,6 +180,10 @@ def _assign_head(parts: list[tuple[str, Line]]) -> tuple[str, str, list[str]]:
             or next((p for p, l in rest if l.italic and l.bold and len(p.split()) <= 8), None)
             or next((p for p, l in rest if not l.italic and len(p.split()) <= 8), None))
     others = [p for p, l in rest if p != role]
+    if comp and not role:
+        m = re.match(r"^(.+?)\s+(?:tại|at)\s+(.+)$", comp, re.IGNORECASE)
+        if m and len(m.group(1).split()) <= 8 and rulebook.contains_any(m.group(2), exp["company_words"]):
+            role, comp = m.group(1).strip(), m.group(2).strip()
     return comp or "", role or "", others
 
 

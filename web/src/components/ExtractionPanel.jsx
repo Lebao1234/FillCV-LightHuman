@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import Field from './Field.jsx'
-import { SUPPORTED_LANGUAGES } from '@/i18n/config.jsx'
+
 
 const ICON_FILE = (
   <svg
@@ -227,49 +227,59 @@ export default function ExtractionPanel({
               </Field>
             </div>
 
-            <fieldset className="form-fieldset mb-4">
-              <legend className="form-label">Ngôn ngữ xuất hồ sơ</legend>
-              <div className="lang-options">
-                {SUPPORTED_LANGUAGES.map((l) => (
-                  <label key={l.code}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              <fieldset className="form-fieldset min-w-0 mb-0">
+                <legend className="form-label">Ngôn ngữ xuất hồ sơ</legend>
+                <div className="lang-options flex flex-wrap gap-x-4 gap-y-1.5">
+                  <label>
                     <input
                       type="radio"
                       name="targetLang"
-                      value={l.code}
-                      checked={inputLang === l.code}
-                      onChange={() => setInputLang(l.code)}
+                      value="vi"
+                      checked={inputLang === 'vi'}
+                      onChange={() => setInputLang('vi')}
                     />
-                    {l.label}
+                    Tiếng Việt
                   </label>
-                ))}
-              </div>
-            </fieldset>
+                  <label>
+                    <input
+                      type="radio"
+                      name="targetLang"
+                      value="en"
+                      checked={inputLang === 'en'}
+                      onChange={() => setInputLang('en')}
+                    />
+                    English
+                  </label>
+                </div>
+              </fieldset>
 
-            <fieldset className="form-fieldset mb-4">
-              <legend className="form-label">Thông tin liên hệ (SĐT, Email...)</legend>
-              <div className="contact-options">
-                <label>
-                  <input
-                    type="radio"
-                    name="initialKeepContact"
-                    value="strip"
-                    checked={!inputKeepContact}
-                    onChange={() => setInputKeepContact(false)}
-                  />
-                  Cắt bỏ toàn bộ liên hệ
-                </label>
-                <label>
-                  <input
-                    type="radio"
-                    name="initialKeepContact"
-                    value="keep"
-                    checked={inputKeepContact}
-                    onChange={() => setInputKeepContact(true)}
-                  />
-                  Giữ nguyên liên hệ
-                </label>
-              </div>
-            </fieldset>
+              <fieldset className="form-fieldset min-w-0 mb-0">
+                <legend className="form-label">Thông tin liên hệ (SĐT, Email...)</legend>
+                <div className="contact-options flex flex-wrap gap-x-4 gap-y-1.5">
+                  <label>
+                    <input
+                      type="radio"
+                      name="initialKeepContact"
+                      value="strip"
+                      checked={!inputKeepContact}
+                      onChange={() => setInputKeepContact(false)}
+                    />
+                    Cắt bỏ toàn bộ liên hệ
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
+                      name="initialKeepContact"
+                      value="keep"
+                      checked={inputKeepContact}
+                      onChange={() => setInputKeepContact(true)}
+                    />
+                    Giữ nguyên liên hệ
+                  </label>
+                </div>
+              </fieldset>
+            </div>
 
             <button
               type="submit"
@@ -367,13 +377,13 @@ export default function ExtractionPanel({
           </div>
         </div>
 
-        {/* THẺ KẾT QUẢ BÓC TÁCH & PHÂN TÍCH THÔNG MINH */}
+        {/* THẺ KẾT QUẢ BÓC TÁCH: Gộp thành 2 khối rõ thứ tự ưu tiên (1. Tóm tắt ứng viên -> 2. Mục cần kiểm tra) */}
         {hasData && (
           <div className="insights-container">
-            {/* 1. Tổng quan ứng viên */}
+            {/* 1. Khối tóm tắt ứng viên (đọc đầu tiên) */}
             <div className="insight-card highlight">
               <div className="ic-header">
-                <span className="ic-title">Ứng viên đã nhận diện</span>
+                <span className="ic-title">1. Ứng viên đã nhận diện</span>
                 <span className="ic-badge ok">Khớp cấu trúc</span>
               </div>
               <div className="ic-candidate">
@@ -395,81 +405,90 @@ export default function ExtractionPanel({
                   </span>
                 </div>
               </div>
+
+              {/* Lương mong muốn & PII đã lọc xếp 2 cột gọn bên trong thẻ tổng quan */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 pt-3 border-t border-line">
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted">
+                    Lương mong muốn <span className="font-normal">(nội bộ)</span>
+                  </div>
+                  <div className="text-sm font-semibold text-navy mt-0.5">
+                    {cvData.expected_salary || 'CV gốc không ghi mức lương'}
+                  </div>
+                  <div className="text-xs text-muted mt-0.5">Không đưa vào PDF xuất ra.</div>
+                </div>
+
+                {removedFields.length > 0 && (
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted">
+                      Đã lọc bảo mật PII ({removedFields.length} trường)
+                    </div>
+                    <ul className="ic-list mt-1">
+                      {removedFields.map((item, i) => (
+                        <li key={i}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* 2. Dữ liệu nhạy cảm PII đã được loại bỏ */}
-            {removedFields.length > 0 && (
-              <div className="insight-card">
+            {/* 2. Khối cần kiểm tra trước khi duyệt (gom Lưu ý tuyển dụng + Tự lập + Xem lại vào 1 thẻ có thứ tự) */}
+            {(recruitingFlags.length > 0 || selfCreated.length > 0 || reviewNotes.length > 0) && (
+              <div className={`insight-card ${recruitingFlags.length > 0 || reviewNotes.length > 0 ? 'warn' : ''}`}>
                 <div className="ic-header">
-                  <span className="ic-title">Đã loại bỏ khỏi CV (Bảo mật PII)</span>
-                  <span className="ic-pill">{removedFields.length} trường</span>
+                  <span className="ic-title">2. Cần kiểm tra trước khi duyệt</span>
+                  <span className={`ic-pill ${recruitingFlags.length > 0 || reviewNotes.length > 0 ? 'warn' : ''}`}>
+                    {recruitingFlags.length + selfCreated.length + reviewNotes.length} mục
+                  </span>
                 </div>
-                <ul className="ic-list">
-                  {removedFields.map((item, i) => (
-                    <li key={i}>{item}</li>
-                  ))}
-                </ul>
+
+                <div className="space-y-3">
+                  {recruitingFlags.length > 0 && (
+                    <div>
+                      <div className="text-xs font-semibold text-warn mb-1">
+                        Lưu ý tuyển dụng ({recruitingFlags.length})
+                      </div>
+                      <ul className="ic-list">
+                        {recruitingFlags.map((item, i) => (
+                          <li key={i}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {selfCreated.length > 0 && (
+                    <div>
+                      <div className="text-xs font-semibold text-navy mb-1">
+                        Hệ thống tự lập / Điều chỉnh ({selfCreated.length})
+                      </div>
+                      <ul className="ic-list">
+                        {selfCreated.map((item, i) => (
+                          <li key={i}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {reviewNotes.length > 0 && (
+                    <div>
+                      <div className="text-xs font-semibold text-warn mb-1">
+                        Cần xem lại khi duyệt ({reviewNotes.length})
+                      </div>
+                      <ul className="ic-list">
+                        {reviewNotes.map(([p, msg], i) => (
+                          <li key={i}>
+                            <strong>{p}:</strong> {msg}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
-            {/* 3. Lương mong muốn */}
-            <div className="insight-card">
-              <div className="ic-header">
-                <span className="ic-title">Lương mong muốn</span>
-                <span className="ic-sub">Ghi chú nội bộ</span>
-              </div>
-              <div className="ic-salary">{cvData.expected_salary || 'CV gốc không ghi mức lương'}</div>
-              <div className="ic-hint">Không đưa vào bản PDF xuất ra — chỉ lưu nội bộ để trao đổi với khách.</div>
-            </div>
-
-            {/* 4. Hệ thống tự lập hoặc điều chỉnh */}
-            {selfCreated.length > 0 && (
-              <div className="insight-card">
-                <div className="ic-header">
-                  <span className="ic-title">Hệ thống tự lập / Điều chỉnh</span>
-                  <span className="ic-pill">{selfCreated.length}</span>
-                </div>
-                <ul className="ic-list">
-                  {selfCreated.map((item, i) => (
-                    <li key={i}>{item}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* 5. Cờ tuyển dụng & Cảnh báo */}
-            {recruitingFlags.length > 0 && (
-              <div className="insight-card warn">
-                <div className="ic-header">
-                  <span className="ic-title">Lưu ý tuyển dụng</span>
-                  <span className="ic-pill warn">{recruitingFlags.length}</span>
-                </div>
-                <ul className="ic-list">
-                  {recruitingFlags.map((item, i) => (
-                    <li key={i}>{item}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* 6. Mục cần xem lại */}
-            {reviewNotes.length > 0 && (
-              <div className="insight-card warn">
-                <div className="ic-header">
-                  <span className="ic-title">Cần xem lại khi duyệt</span>
-                  <span className="ic-pill warn">{reviewNotes.length}</span>
-                </div>
-                <ul className="ic-list">
-                  {reviewNotes.map(([p, msg], i) => (
-                    <li key={i}>
-                      <strong>{p}:</strong> {msg}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* 7. Thông báo lỗi hồ sơ nếu có */}
+            {/* 3. Thông báo lỗi hồ sơ nếu có */}
             {totalErrors > 0 && (
               <div className="lh-alert err" role="alert">
                 <div className="t">Còn {totalErrors} lỗi cần xử lý</div>

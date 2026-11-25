@@ -22,7 +22,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 # Mô hình dựng sẵn: tên trên HuggingFace, thư mục xuất mặc định, file tách từ cần chép theo (cũng là file bắt buộc phải có)
 PRESETS = {
     "opus": ("Helsinki-NLP/opus-mt-vi-en", "opus-mt-vi-en", ["source.spm", "target.spm"]),
+    "opus-en-vi": ("Helsinki-NLP/opus-mt-en-vi", "opus-mt-en-vi", ["source.spm", "target.spm"]),   # chiều Anh -> Việt, Apache-2.0
     "vinai": ("vinai/vinai-translate-vi2en-v2", "vinai-vi2en", ["sentencepiece.bpe.model"]),
+    "nllb": ("facebook/nllb-200-distilled-600M", "nllb-200-vi-en", ["sentencepiece.bpe.model"]),
 }
 
 
@@ -39,7 +41,8 @@ def convert(model: str, out_dir: Path, quantization: str = "int8", copy_files: l
 # Điểm vào dòng lệnh
 def main() -> int:
     parser = argparse.ArgumentParser(description="Chuyển mô hình dịch vi -> en sang CTranslate2")
-    parser.add_argument("--preset", default="opus", choices=sorted(PRESETS), help="opus (nhẹ, chất lượng vừa) hoặc vinai (nặng hơn, tốt hơn, AGPL-3.0)")
+    parser.add_argument("--preset", default="opus", choices=sorted(PRESETS),
+                        help="opus (Việt->Anh, CC-BY 4.0), opus-en-vi (Anh->Việt, Apache-2.0), vinai (AGPL-3.0), nllb (CC-BY-NC 4.0: CẤM thương mại)")
     parser.add_argument("--model", help="ghi đè tên mô hình trên HuggingFace hoặc thư mục cục bộ")
     parser.add_argument("--out", help="ghi đè thư mục xuất (mặc định data/models/<tên preset>)")
     parser.add_argument("--quantization", default="int8", choices=["int8", "int8_float16", "float16", "float32"])
